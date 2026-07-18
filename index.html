@@ -160,6 +160,9 @@
                         <button onclick="exportCsv()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
                         </button>
+                        <button onclick="clearResults()" title="Vymazat celý seznam výsledků" class="border border-gray-300 bg-white text-gray-400 w-8 h-[30px] rounded-lg text-xs hover:text-red-600 hover:border-red-300 transition inline-flex items-center justify-center">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm min-w-[760px]">
@@ -371,11 +374,17 @@
     const SEARCH_FIELDS_FREE = 'places.id,nextPageToken';
 
     async function textSearch(query, geo, radius, pageToken) {
+        // locationRestriction = tvrdé ohraničení oblasti (bias byl jen "doporučení" a u malých obcí Google vracel výsledky odjinud)
+        const dLat = radius / 111320;
+        const dLng = radius / (111320 * Math.cos(geo.lat * Math.PI / 180));
         const body = {
             textQuery: query,
             pageSize: 20,
             languageCode: 'cs',
-            locationBias: { circle: { center: { latitude: geo.lat, longitude: geo.lng }, radius: radius } }
+            locationRestriction: { rectangle: {
+                low:  { latitude: geo.lat - dLat, longitude: geo.lng - dLng },
+                high: { latitude: geo.lat + dLat, longitude: geo.lng + dLng }
+            } }
         };
         if (pageToken) body.pageToken = pageToken;
         const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
@@ -419,7 +428,7 @@
                 do {
                     page++;
                     let data;
-                    try { data = await textSearch(cat + ' ' + place, geo, radius, token); okCount++; }
+                    try { data = await textSearch(cat, geo, radius, token); okCount++; }
                     catch (e) {
                         console.warn('Search failed for', cat, e);
                         failCount++; lastErr = e;
@@ -558,6 +567,14 @@
     }
     function toggleAll(on) { filteredRows().forEach(r => r.selected = on); renderTable(); }
     function toggleRow(id, on) { const r = state.results.get(id); if (r) r.selected = on; }
+
+    function clearResults() {
+        if (!state.results.size) return;
+        if (!confirm('Vymazat všech ' + state.results.size + ' výsledků?')) return;
+        state.results.clear();
+        renderTable();
+        showToast('Seznam vymazán.');
+    }
 
     function mapsLink(id) { return 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(id); }
 
