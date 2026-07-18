@@ -263,29 +263,30 @@
         document.getElementById('cnt-geo').textContent = state.counters.geo;
     }
 
-    // ===================== GEOKÓDOVÁNÍ OBCE =====================
-    async function geocodePlace(query) {
+    // ===================== GEOKÓDOVÁNÍ OBCE (přes Maps JS API – funguje s klíčem omezeným na doménu) =====================
+    function geocodePlace(query) {
         const key = query.toLowerCase();
-        if (state.geoCache.has(key)) return state.geoCache.get(key);
-        const url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(query)
-            + '&region=cz&language=cs&components=country:CZ|country:SK&key=' + EFFECTIVE_API_KEY;
-        const r = await fetch(url);
-        const j = await r.json();
-        bumpCounter('geo');
-        if (j.status === 'REQUEST_DENIED') throw new Error('API klíč nemá povolené Geocoding API nebo je omezen na jinou doménu.');
-        if (!j.results || !j.results.length) throw new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres, např. „Jestřabí Lhota, okres Kolín".');
-        const res = j.results[0];
-        const loc = res.geometry.location;
-        let radius = 2500;
-        if (res.geometry.bounds || res.geometry.viewport) {
-            const b = res.geometry.bounds || res.geometry.viewport;
-            const dLat = Math.abs(b.northeast.lat - b.southwest.lat) * 111320 / 2;
-            const dLng = Math.abs(b.northeast.lng - b.southwest.lng) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
-            radius = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
-        }
-        const out = { lat: loc.lat, lng: loc.lng, radius, label: res.formatted_address };
-        state.geoCache.set(key, out);
-        return out;
+        if (state.geoCache.has(key)) return Promise.resolve(state.geoCache.get(key));
+        return mapsReady.then(() => new Promise((resolve, reject) => {
+            new google.maps.Geocoder().geocode({ address: query, region: 'cz' }, (results, status) => {
+                bumpCounter('geo');
+                if (status === 'REQUEST_DENIED') { reject(new Error('Geokódování odmítnuto – zkontrolujte, že je v Cloud Console povolené Geocoding API pro tento projekt.')); return; }
+                if (status !== 'OK' || !results || !results.length) { reject(new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres, např. „Jestřabí Lhota, okres Kolín".')); return; }
+                const res = results[0];
+                const loc = { lat: res.geometry.location.lat(), lng: res.geometry.location.lng() };
+                let radius = 2500;
+                const b = res.geometry.bounds || res.geometry.viewport;
+                if (b) {
+                    const ne = b.getNorthEast(), sw = b.getSouthWest();
+                    const dLat = Math.abs(ne.lat() - sw.lat()) * 111320 / 2;
+                    const dLng = Math.abs(ne.lng() - sw.lng()) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
+                    radius = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
+                }
+                const out = { lat: loc.lat, lng: loc.lng, radius, label: res.formatted_address };
+                state.geoCache.set(key, out);
+                resolve(out);
+            });
+        }));
     }
 
     // ===================== HLEDÁNÍ (Places API New – Text Search, ID-only = zdarma bez limitu) =====================
@@ -531,12 +532,14 @@
         showToast('Exportováno ' + rows.length + ' zápisů' + (sel.length ? ' (jen vybrané)' : '') + '.');
     }
 
-    // ===================== MAPS JS API (jen kvůli Street View metadatům) =====================
-    window.initGoogleServices = function () { /* StreetViewService se vytváří líně */ };
+    // ===================== MAPS JS API (geokódování + Street View metadata) =====================
+    let mapsReadyResolve;
+    const mapsReady = new Promise(res => { mapsReadyResolve = res; });
+    window.initGoogleServices = function () { mapsReadyResolve(); };
     (function loadGoogleMaps() {
         const s = document.createElement('script');
         s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&language=cs&callback=initGoogleServices';
-        s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – ověření virtuálek nebude fungovat. Zkontrolujte API klíč.');
+        s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – zkontrolujte API klíč a povolené domény (při otevření souboru z disku přes file:// klíč omezený na doménu nefunguje – otestujte až na GitHub Pages).');
         document.head.appendChild(s);
     })();
 
