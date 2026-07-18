@@ -208,12 +208,13 @@
                         </button>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm min-w-[860px]">
+                        <table class="w-full text-sm min-w-[980px]">
                             <thead>
                                 <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                                     <th class="px-4 py-3">Lead</th>
                                     <th class="px-2 py-3">Kontaktní osoba</th>
                                     <th class="px-2 py-3">Telefon</th>
+                                    <th class="px-2 py-3">Web</th>
                                     <th class="px-2 py-3">E-mail</th>
                                     <th class="px-2 py-3">Poznámka</th>
                                     <th class="px-4 py-3 text-right">Akce</th>
@@ -231,7 +232,7 @@
     <!-- MODAL: NÁHLED PROFILU -->
     <div id="profile-modal" class="hidden fixed inset-0 z-[70]">
         <div class="absolute inset-0 bg-gray-900/60" onclick="closeProfile()"></div>
-        <div class="absolute inset-x-3 top-4 bottom-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[860px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div class="absolute inset-x-3 top-4 bottom-4 sm:inset-x-auto sm:left-4 sm:w-[470px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div class="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3 shrink-0">
                 <h3 class="font-bold text-gray-900 text-sm">Náhled firemního profilu</h3>
                 <button onclick="openFullProfile()" class="inline-flex items-center gap-1.5 border border-brand-500 text-brand-600 rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-50 transition"><i class="fa-solid fa-window-restore"></i> Celý profil v okně</button>
@@ -239,14 +240,14 @@
                 <button onclick="closeProfile()" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="flex-1 overflow-y-auto">
-                <iframe id="modal-iframe" class="w-full" style="height:340px;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+                <iframe id="modal-iframe" class="w-full" style="height:180px;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
                 <div class="p-5">
                     <div class="flex items-center gap-3 mb-4 flex-wrap">
                         <p class="text-sm font-bold text-gray-900">Přidat do mého seznamu</p>
                         <div id="modal-stars" class="flex items-center gap-0.5"></div>
                         <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký lead</span>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Kontaktní osoba</label>
                             <input id="modal-person" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="Jan Novák">
@@ -259,7 +260,11 @@
                             <label class="block text-xs font-medium text-gray-500 mb-1">E-mail</label>
                             <input id="modal-email" type="email" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="info@…">
                         </div>
-                        <div class="sm:col-span-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Web</label>
+                            <input id="modal-web" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="www.…">
+                        </div>
+                        <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Osobní poznámka</label>
                             <textarea id="modal-note" rows="2" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500 resize-y" placeholder="např. majitel má zájem o virtuálku, zavolat v pondělí…"></textarea>
                         </div>
@@ -267,7 +272,7 @@
                     <div class="mt-4 flex items-center gap-2 flex-wrap">
                         <button onclick="saveLead()" class="bg-brand-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-solid fa-plus mr-1.5"></i>Uložit do seznamu</button>
                         <button id="modal-remove" onclick="removeLead()" class="hidden border border-red-200 text-red-600 py-2 px-4 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Odebrat ze seznamu</button>
-                        <span class="text-[11px] text-gray-400">Seznam se ukládá jen ve vašem prohlížeči.</span>
+                        <span class="text-[11px] text-gray-400">Údaje zkopírujte z profilu vpravo. Seznam se ukládá ve vašem prohlížeči.</span>
                     </div>
                 </div>
             </div>
@@ -951,6 +956,7 @@
             </td>
             <td class="px-2 py-3 text-sm text-gray-800">${esc(l.person || '') || '<span class="text-gray-300">–</span>'}</td>
             <td class="px-2 py-3 text-sm whitespace-nowrap">${l.phone ? '<a href="tel:' + esc(String(l.phone).replace(/\s/g, '')) + '" class="text-gray-800 hover:text-brand-600 font-medium">' + esc(l.phone) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-2 py-3 text-xs">${l.web ? '<a href="' + esc(/^https?:/.test(l.web) ? l.web : 'https://' + l.web) + '" target="_blank" rel="noopener" class="text-brand-600 hover:underline break-all">' + esc(String(l.web).replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
             <td class="px-2 py-3 text-sm">${l.email ? '<a href="mailto:' + esc(l.email) + '" class="text-brand-600 hover:underline break-all">' + esc(l.email) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
             <td class="px-2 py-3 text-xs text-gray-500 max-w-[220px]">${esc(l.note || '') || '<span class="text-gray-300">–</span>'}</td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -974,6 +980,7 @@
             'Hvězdy (1–5)': l.stars || '',
             'Kontaktní osoba': l.person || '',
             'Telefon': l.phone || '',
+            'Web': l.web || '',
             'E-mail': l.email || '',
             'Poznámka': l.note || '',
             'Oblast': l.area || '',
@@ -983,7 +990,7 @@
             'Uloženo': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : ''
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [{wch:10},{wch:20},{wch:16},{wch:26},{wch:40},{wch:28},{wch:12},{wch:30},{wch:55},{wch:12}];
+        ws['!cols'] = [{wch:10},{wch:20},{wch:16},{wch:28},{wch:26},{wch:40},{wch:28},{wch:12},{wch:30},{wch:55},{wch:12}];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Moje leady');
         XLSX.writeFile(wb, 'moje-leady-' + new Date().toISOString().slice(0, 10) + '.xlsx');
@@ -1001,12 +1008,14 @@
         document.getElementById('modal-person').value = lead ? (lead.person || '') : '';
         document.getElementById('modal-phone').value = lead ? (lead.phone || '') : '';
         document.getElementById('modal-email').value = lead ? (lead.email || '') : '';
+        document.getElementById('modal-web').value = lead ? (lead.web || '') : '';
         document.getElementById('modal-note').value = lead ? (lead.note || '') : '';
         state.modalStars = lead ? (lead.stars || 0) : 0;
         renderModalStars();
         document.getElementById('modal-remove').classList.toggle('hidden', !lead);
         document.getElementById('profile-modal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+        openFullProfile(); // celý profil se otevře rovnou vpravo vedle formuláře
     }
     function closeProfile() {
         document.getElementById('profile-modal').classList.add('hidden');
@@ -1017,12 +1026,12 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.modalId) closeProfile(); });
     function openFullProfile() {
         if (!state.modalId) return;
-        const w = Math.min(540, Math.round(screen.width * 0.55));
-        const h = Math.min(840, Math.round(screen.height * 0.92));
-        const left = Math.round((screen.width - w) / 2), top = Math.round((screen.height - h) / 2);
+        const w = Math.round(screen.width * 0.52);
+        const h = Math.round(screen.height * 0.92);
+        const left = Math.round(screen.width * 0.46), top = Math.round(screen.height * 0.03);
         const win = window.open(mapsLink(state.modalId), 'vlf-profil',
             'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',menubar=no,toolbar=no,location=no,status=no');
-        if (!win) showToast('Prohlížeč zablokoval vyskakovací okno – povolte je pro tuto stránku.');
+        if (!win) showToast('Prohlížeč zablokoval vyskakovací okno – povolte je pro tuto stránku a zkuste to znovu.');
     }
     function renderModalStars() {
         document.getElementById('modal-stars').innerHTML = [1, 2, 3, 4, 5].map(i =>
@@ -1039,6 +1048,7 @@
             id,
             person: document.getElementById('modal-person').value.trim(),
             phone: document.getElementById('modal-phone').value.trim(),
+            web: document.getElementById('modal-web').value.trim(),
             email: document.getElementById('modal-email').value.trim(),
             note: document.getElementById('modal-note').value.trim(),
             stars: state.modalStars,
