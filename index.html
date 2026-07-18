@@ -30,6 +30,10 @@
         .b-gray { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
         .b-amber { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
         .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+        #place-suggest { position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,.08); z-index:60; overflow:hidden; }
+        #place-suggest button { display:block; width:100%; text-align:left; padding:9px 14px; font-size:13.5px; color:#374151; }
+        #place-suggest button:hover, #place-suggest button.active { background:#f0fdf4; color:#166534; }
+        #place-suggest .sug-sec { color:#9ca3af; font-size:11.5px; }
     </style>
 </head>
 <body class="font-sans text-gray-900 h-screen flex overflow-hidden antialiased">
@@ -100,7 +104,8 @@
                             <label class="block text-sm font-medium text-gray-600 mb-1.5">Obec / město / vesnice</label>
                             <div class="relative">
                                 <i class="fa-solid fa-location-dot absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                                <input id="inp-place" type="text" placeholder="např. Kolín, Kutná Hora, Červené Pečky…" class="w-full pl-9 p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" onkeydown="if(event.key==='Enter')runSearch()">
+                                <input id="inp-place" type="text" placeholder="např. Kolín, Kutná Hora, Podolánka…" autocomplete="off" class="w-full pl-9 p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" oninput="onPlaceInput()" onkeydown="onPlaceKey(event)" onblur="setTimeout(hideSuggest, 180)">
+                                <div id="place-suggest" class="hidden"></div>
                             </div>
                         </div>
                         <div>
@@ -289,6 +294,57 @@
         }));
     }
 
+    // ===================== NAŠEPTÁVAČ OBCÍ (Autocomplete – zdarma do 10 000/měs.) =====================
+    let acService = null, sugTimer = null, sugItems = [], sugActive = -1;
+    function onPlaceInput() {
+        clearTimeout(sugTimer);
+        const q = document.getElementById('inp-place').value.trim();
+        if (q.length < 2) { hideSuggest(); return; }
+        sugTimer = setTimeout(() => fetchSuggestions(q), 300);
+    }
+    function fetchSuggestions(q) {
+        mapsReady.then(() => {
+            if (!acService) acService = new google.maps.places.AutocompleteService();
+            acService.getPlacePredictions({
+                input: q,
+                types: ['(regions)'],
+                componentRestrictions: { country: ['cz', 'sk'] },
+                language: 'cs'
+            }, (preds, status) => {
+                if (status !== 'OK' || !preds || !preds.length) { hideSuggest(); return; }
+                sugItems = preds.slice(0, 6).map(p => ({
+                    main: (p.structured_formatting && p.structured_formatting.main_text) || p.description,
+                    sec: (p.structured_formatting && p.structured_formatting.secondary_text) || '',
+                    full: p.description
+                }));
+                sugActive = -1;
+                renderSuggest();
+            });
+        });
+    }
+    function renderSuggest() {
+        const box = document.getElementById('place-suggest');
+        box.innerHTML = sugItems.map((s, i) =>
+            `<button type="button" class="${i === sugActive ? 'active' : ''}" onmousedown="pickSuggest(${i})"><strong>${esc(s.main)}</strong> <span class="sug-sec">${esc(s.sec)}</span></button>`
+        ).join('');
+        box.classList.remove('hidden');
+    }
+    function hideSuggest() { document.getElementById('place-suggest').classList.add('hidden'); sugItems = []; sugActive = -1; }
+    function pickSuggest(i) {
+        const s = sugItems[i];
+        if (!s) return;
+        document.getElementById('inp-place').value = s.full;
+        hideSuggest();
+        runSearch();
+    }
+    function onPlaceKey(e) {
+        if (!sugItems.length) { if (e.key === 'Enter') runSearch(); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); sugActive = (sugActive + 1) % sugItems.length; renderSuggest(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); sugActive = (sugActive - 1 + sugItems.length) % sugItems.length; renderSuggest(); }
+        else if (e.key === 'Enter') { e.preventDefault(); sugActive >= 0 ? pickSuggest(sugActive) : (hideSuggest(), runSearch()); }
+        else if (e.key === 'Escape') hideSuggest();
+    }
+
     // ===================== HLEDÁNÍ (Places API New – Text Search, ID-only = zdarma bez limitu) =====================
     const SEARCH_FIELDS_FREE = 'places.id,nextPageToken';
 
@@ -333,7 +389,7 @@
             const geo = await geocodePlace(place);
             const radiusSel = document.getElementById('inp-radius').value;
             const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
-            let added = 0, i = 0;
+            let added = 0, i = 0, okCount = 0, failCount = 0, lastErr = null;
             for (const cat of ALL_QUERIES) {
                 i++;
                 progText.textContent = `${Math.round(i / ALL_QUERIES.length * 100)} % · „${cat}" – ${geo.label} · zatím ${state.results.size} zápisů`;
@@ -341,8 +397,14 @@
                 do {
                     page++;
                     let data;
-                    try { data = await textSearch(cat + ' ' + place, geo, radius, token); }
-                    catch (e) { console.warn('Search failed for', cat, e); break; }
+                    try { data = await textSearch(cat + ' ' + place, geo, radius, token); okCount++; }
+                    catch (e) {
+                        console.warn('Search failed for', cat, e);
+                        failCount++; lastErr = e;
+                        // pokud selhávají hned první dotazy, nemá smysl projíždět celou sadu
+                        if (okCount === 0 && failCount >= 3) throw new Error('Hledání selhává – Places API vrací chybu: ' + (e.message || 'neznámá chyba'));
+                        break;
+                    }
                     (data.places || []).forEach(p => {
                         if (!p.id) return;
                         if (state.results.has(p.id)) {
@@ -364,7 +426,8 @@
                 } while (token && page < maxPages);
                 if (i % 10 === 0) renderTable();
             }
-            showToast(added ? `Přidáno ${added} nových zápisů (celkem ${state.results.size}).` : 'Nenašly se žádné nové zápisy.');
+            if (failCount > 0 && lastErr) showApiError('Část dotazů selhala (' + failCount + '). Poslední chyba: ' + (lastErr.message || 'neznámá'));
+            showToast(added ? `Přidáno ${added} nových zápisů (celkem ${state.results.size}).` : (failCount ? 'Hledání selhalo – viz chyba nahoře.' : 'Nenašly se žádné nové zápisy.'));
             renderTable();
         } catch (e) {
             showToast(e.message || 'Hledání selhalo.');
@@ -538,7 +601,7 @@
     window.initGoogleServices = function () { mapsReadyResolve(); };
     (function loadGoogleMaps() {
         const s = document.createElement('script');
-        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&language=cs&callback=initGoogleServices';
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&libraries=places&language=cs&callback=initGoogleServices';
         s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – zkontrolujte API klíč a povolené domény (při otevření souboru z disku přes file:// klíč omezený na doménu nefunguje – otestujte až na GitHub Pages).');
         document.head.appendChild(s);
     })();
