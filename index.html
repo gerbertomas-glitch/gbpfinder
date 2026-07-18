@@ -56,20 +56,10 @@
             <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left bg-brand-50 text-brand-700">
                 <i class="fa-solid fa-magnifying-glass-location w-5 text-center"></i> Vyhledávání leadů
             </button>
-            <button onclick="runDiagnostics()" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left text-gray-600 hover:bg-gray-100">
-                <i class="fa-solid fa-stethoscope w-5 text-center"></i> Diagnostika API
-            </button>
             <button onclick="scrollToMyList()" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left text-gray-600 hover:bg-gray-100">
                 <i class="fa-solid fa-star w-5 text-center"></i> Můj seznam <span id="nav-mylist-count" class="badge b-green ml-auto">0</span>
             </button>
 
-            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Spotřeba (relace)</p>
-            <div class="mx-3 card-minimal !shadow-none p-3 text-xs text-gray-600 space-y-1.5">
-                <div class="flex justify-between"><span>Hledání <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-free" class="text-gray-900">0</strong></div>
-                <div class="flex justify-between"><span>Geokódování <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
-                <div class="flex justify-between"><span>Našeptávač <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-ac" class="text-gray-900">0</strong></div>
-            </div>
-            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy, mapa i náhledy profilů jsou zdarma bez limitu. Limit (společný pro celý tým) čerpá jen geokódování adresy a našeptávač. Bod zvolený kliknutím do mapy nečerpá nic.</p>
         </nav>
         <div class="p-4 border-t border-border bg-gray-50">
             <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
@@ -247,8 +237,13 @@
                 <div class="p-5">
                     <div class="flex items-center gap-3 mb-4 flex-wrap">
                         <p class="text-sm font-bold text-gray-900">Přidat do mého seznamu</p>
-                        <div id="modal-stars" class="flex items-center gap-0.5"></div>
-                        <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký lead</span>
+                        <div id="modal-stars" class="flex items-center gap-0.5" onmouseleave="hoverStars(0)"></div>
+                        <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký</span>
+                        <span class="flex-1"></span>
+                        <div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-bold">
+                            <button type="button" id="ver-yes" onclick="setVerified('yes')" class="py-1.5 px-3 transition">Ověřen</button>
+                            <button type="button" id="ver-no" onclick="setVerified('no')" class="py-1.5 px-3 transition border-l border-gray-200">Neověřen</button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div class="sm:col-span-2">
@@ -402,8 +397,10 @@
         busy: false,
         cancel: false,
         myLeads: new Map(),
+        excluded: new Set(),
         modalId: null,
         modalStars: 0,
+        modalVerified: '',
         custom: null,     // {lat,lng} – bod zvolený kliknutím do mapy / přetažením špendlíku
         lastGeo: null,    // poslední vyřešený střed (pro živý náhled při změně okruhu)
         pickMode: false
@@ -431,12 +428,7 @@
         b.classList.remove('hidden');
     }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-    function bumpCounter(key) {
-        state.counters[key]++;
-        document.getElementById('cnt-free').textContent = state.counters.free;
-        document.getElementById('cnt-geo').textContent = state.counters.geo;
-        document.getElementById('cnt-ac').textContent = state.counters.ac;
-    }
+    function bumpCounter(key) { state.counters[key]++; }
     const sleep = (ms) => new Promise(res => setTimeout(res, ms));
     function fmtKm(m) { return (m / 1000).toFixed(1).replace('.', ','); }
 
@@ -490,7 +482,7 @@
                 const err = await r.json().catch(() => ({}));
                 if (!fetchSuggestions._errShown) {
                     fetchSuggestions._errShown = true;
-                    showApiError('Našeptávač selhal (HTTP ' + r.status + '): ' + ((err.error && err.error.message) || 'neznámá chyba') + '\nSpusťte „Diagnostika API" v levém menu.');
+                    showApiError('Našeptávač selhal (HTTP ' + r.status + '): ' + ((err.error && err.error.message) || 'neznámá chyba') + '');
                 }
                 hideSuggest(); return;
             }
@@ -840,12 +832,23 @@
     function renderMap(rows) {
         if (!map || !markerLayer) { if (!rows.some(r => r.loc)) return; ensureMap(); }
         markerLayer.clearLayers();
+        const seen = new Map(); // stejné souřadnice (firmy ve stejném čtverci mřížky) rozprostřít do kroužku, ať se body nepřekrývají
         rows.forEach((r, idx) => {
             if (!r.loc) return;
-            const m = L.circleMarker([r.loc.lat, r.loc.lng], {
+            const key = r.loc.lat.toFixed(5) + ',' + r.loc.lng.toFixed(5);
+            const n = seen.get(key) || 0;
+            seen.set(key, n + 1);
+            let lat = r.loc.lat, lng = r.loc.lng;
+            if (n > 0) {
+                const ang = n * 2.399963; // zlatý úhel – rovnoměrné rozprostření
+                const rad = 0.00018 * (1 + Math.floor(n / 8));
+                lat += Math.cos(ang) * rad;
+                lng += Math.sin(ang) * rad / Math.cos(lat * Math.PI / 180);
+            }
+            const m = L.circleMarker([lat, lng], {
                 radius: 7,
                 color: '#ffffff', weight: 2,
-                fillColor: '#16a34a',
+                fillColor: state.excluded.has(r.id) ? '#dc2626' : '#16a34a',
                 fillOpacity: 0.95
             });
             m.bindPopup(`<strong>Firemní zápis #${idx + 1}</strong><br>${esc(r.cats.slice(0, 3).join(', '))}<br>≈ ${fmtKm(r.distM || 0)} km od středu · ±${r.accM} m<br><a href="${mapsLink(r.id)}" target="_blank" rel="noopener">otevřít zápis ↗</a>`);
@@ -888,8 +891,10 @@
             if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu <span class="text-gray-300">· přesnost ±${r.accM} m</span>`;
             else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
             const saved = state.myLeads.get(r.id);
-            const savedBadge = saved ? `<span class="badge ${saved.excluded ? 'b-red' : 'b-green'}"><i class="fa-solid ${saved.excluded ? 'fa-ban' : 'fa-star'}"></i> ${saved.excluded ? 'vyřazený' : (saved.stars || '–') + '/5 v seznamu'}</span>${saved.name ? ' <span class="text-gray-500 font-medium">' + esc(saved.name) + '</span>' : ''} ` : '';
-            return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
+            const isExc = state.excluded.has(r.id);
+            const savedBadge = (isExc ? '<span class="badge b-red"><i class="fa-solid fa-ban"></i> vyřazený</span> ' : '')
+                + (saved ? `<span class="badge b-green"><i class="fa-solid fa-star"></i> ${(saved.stars || '–')}/5 v seznamu</span>${saved.name ? ' <span class="text-gray-500 font-medium">' + esc(saved.name) + '</span>' : ''} ` : '');
+            return `<tr class="border-b transition align-top ${isExc ? 'bg-red-50/80 border-red-100 hover:bg-red-50' : 'border-gray-50 hover:bg-gray-50/60'}">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
                 <td class="px-2 py-3">
@@ -899,7 +904,7 @@
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                     <button onclick="openProfile('${esc(r.id)}')" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-600 transition"><i class="fa-regular fa-eye"></i> zobrazit profil</button>
-                    <button onclick="quickExclude('${esc(r.id)}')" title="${saved && saved.excluded ? 'Vrátit mezi aktivní' : 'Vyřadit – při příštím skenu oblasti hned uvidíte, že tenhle zápis už nechcete'}" class="inline-flex items-center gap-1.5 border ${saved && saved.excluded ? 'border-brand-500 text-brand-600 hover:bg-brand-50' : 'border-gray-200 text-gray-500 hover:text-amber-600 hover:border-amber-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${saved && saved.excluded ? 'fa-rotate-left' : 'fa-ban'}"></i> ${saved && saved.excluded ? 'obnovit' : 'vyřadit'}</button>
+                    <button onclick="quickExclude('${esc(r.id)}')" title="${isExc ? 'Vrátit mezi aktivní' : 'Vyřadit – při příštím skenu oblasti hned uvidíte, že tenhle zápis už nechcete'}" class="inline-flex items-center gap-1.5 border ${isExc ? 'border-red-300 bg-white text-red-600 hover:bg-red-50' : 'border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${isExc ? 'fa-rotate-left' : 'fa-ban'}"></i> ${isExc ? 'obnovit' : 'vyřadit'}</button>
                     <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" title="Otevřít v Google Mapách" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-500 hover:text-brand-600 hover:border-brand-500 transition ml-1"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
                 </td>
             </tr>`;
@@ -936,11 +941,19 @@
     function safeLoadLeads() {
         try {
             const s = localStorage.getItem('vlf-leads');
-            if (s) JSON.parse(s).forEach(l => state.myLeads.set(l.id, l));
-        } catch (e) { /* úložiště nedostupné – seznam poběží jen v paměti */ }
+            if (s) JSON.parse(s).forEach(l => {
+                if (l.excluded) { state.excluded.add(l.id); return; } // migrace staršího formátu
+                state.myLeads.set(l.id, l);
+            });
+            const e = localStorage.getItem('vlf-excluded');
+            if (e) JSON.parse(e).forEach(id => state.excluded.add(id));
+        } catch (err) { /* úložiště nedostupné – poběží jen v paměti */ }
     }
     function persistLeads() {
-        try { localStorage.setItem('vlf-leads', JSON.stringify([...state.myLeads.values()])); } catch (e) {}
+        try {
+            localStorage.setItem('vlf-leads', JSON.stringify([...state.myLeads.values()]));
+            localStorage.setItem('vlf-excluded', JSON.stringify([...state.excluded]));
+        } catch (e) {}
     }
     function scrollToMyList() {
         if (!state.myLeads.size) { showToast('Seznam je zatím prázdný – přidejte lead přes „zobrazit profil".'); return; }
@@ -957,8 +970,7 @@
         let leads = [...state.myLeads.values()];
         if (from != null) leads = leads.filter(l => (l.savedAt || 0) >= from);
         if (to != null) leads = leads.filter(l => (l.savedAt || 0) <= to);
-        // vyřazené až na konec, jinak od nejžhavějších a nejnovějších
-        leads.sort((a, b) => (a.excluded ? 1 : 0) - (b.excluded ? 1 : 0) || (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
+        leads.sort((a, b) => (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
         return leads;
     }
     function mlToggleAll(on) { mlFiltered().forEach(l => l.sel = on); renderMyList(); }
@@ -971,12 +983,12 @@
         document.getElementById('mylist-count').textContent = leads.length === all.length ? all.length : leads.length + ' / ' + all.length;
         document.getElementById('mylist-card').classList.toggle('hidden', all.length === 0);
         const selCount = leads.filter(l => l.sel).length;
-        document.getElementById('ml-export-count').textContent = selCount || leads.filter(l => !l.excluded).length;
-        document.getElementById('mylist-body').innerHTML = leads.map(l => `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top ${l.excluded ? 'opacity-50 bg-gray-50/40' : ''}">
+        document.getElementById('ml-export-count').textContent = selCount || leads.length;
+        document.getElementById('mylist-body').innerHTML = leads.map(l => `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
             <td class="px-4 py-3"><input type="checkbox" ${l.sel ? 'checked' : ''} onchange="mlToggleRow('${esc(l.id)}', this.checked)"></td>
             <td class="px-2 py-3">
-                <div class="flex items-center gap-2 mb-0.5"><span class="flex items-center gap-1">${starsHtml(l.stars || 0)}</span>${l.excluded ? '<span class="badge b-red"><i class="fa-solid fa-ban"></i> vyřazený</span>' : ''}</div>
-                <p class="text-sm font-semibold text-gray-900 ${l.excluded ? 'line-through' : ''}">${esc(l.name || '') || 'Firemní zápis'}</p>
+                <div class="flex items-center gap-2 mb-0.5"><span class="flex items-center gap-1">${starsHtml(l.stars || 0)}</span>${l.verified === 'yes' ? '<span class="badge b-green"><i class="fa-solid fa-circle-check"></i> ověřen</span>' : (l.verified === 'no' ? '<span class="badge b-amber">neověřen</span>' : '')}</div>
+                <p class="text-sm font-semibold text-gray-900">${esc(l.name || '') || 'Firemní zápis'}</p>
                 <p class="text-[11px] text-gray-400">${esc(l.area || '')}${l.distM != null ? ' · ≈ ' + fmtKm(l.distM) + ' km' : ''}</p>
                 <p class="text-[11px] text-gray-400">${esc((l.cats || []).slice(0, 3).join(', '))}</p>
             </td>
@@ -988,36 +1000,20 @@
             <td class="px-2 py-3 text-xs text-gray-500 max-w-[220px]">${esc(l.note || '') || '<span class="text-gray-300">–</span>'}</td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
                 <button onclick="openProfile('${esc(l.id)}')" class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-regular fa-pen-to-square"></i> upravit</button>
-                <button onclick="toggleExcluded('${esc(l.id)}')" title="${l.excluded ? 'Vrátit mezi aktivní' : 'Označit jako vyřazený'}" class="inline-flex items-center gap-1.5 border ${l.excluded ? 'border-brand-500 text-brand-600 hover:bg-brand-50' : 'border-gray-200 text-gray-500 hover:text-amber-600 hover:border-amber-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${l.excluded ? 'fa-rotate-left' : 'fa-ban'}"></i> ${l.excluded ? 'obnovit' : 'vyřadit'}</button>
                 <button onclick="deleteLead('${esc(l.id)}')" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-300 transition ml-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
             </td>
         </tr>`).join('');
     }
     function quickExclude(id) {
-        const lead = state.myLeads.get(id);
-        if (lead) {
-            lead.excluded = !lead.excluded;
-            showToast(lead.excluded ? 'Zápis označen jako vyřazený.' : 'Zápis vrácen mezi aktivní.');
+        if (state.excluded.has(id)) {
+            state.excluded.delete(id);
+            showToast('Zápis vrácen mezi aktivní.');
         } else {
-            const row = state.results.get(id);
-            state.myLeads.set(id, {
-                id, name: '', person: '', phone: '', phone2: '', web: '', email: '', note: '', stars: 0,
-                area: row ? row.area : '', distM: row ? row.distM : null, cats: row ? row.cats : [],
-                excluded: true, savedAt: Date.now()
-            });
-            showToast('Zápis vyřazen – při příštím skenu oblasti bude označený.');
+            state.excluded.add(id);
+            showToast('Zápis vyřazen – při příštím skenu oblasti bude označený červeně.');
         }
         persistLeads();
-        renderMyList();
         renderTable();
-    }
-    function toggleExcluded(id) {
-        const l = state.myLeads.get(id);
-        if (!l) return;
-        l.excluded = !l.excluded;
-        persistLeads();
-        renderMyList();
-        showToast(l.excluded ? 'Lead označen jako vyřazený.' : 'Lead vrácen mezi aktivní.');
     }
     function deleteLead(id) {
         if (!confirm('Odebrat tento lead ze seznamu?')) return;
@@ -1030,12 +1026,12 @@
     function exportXlsx() {
         const filtered = mlFiltered();
         const sel = filtered.filter(l => l.sel);
-        // export: zaškrtnuté; jinak vše ve filtru data kromě vyřazených
-        const leads = sel.length ? sel : filtered.filter(l => !l.excluded);
+        // export: zaškrtnuté; jinak vše v aktuálním filtru data
+        const leads = sel.length ? sel : filtered;
         if (!leads.length) { showToast('Není co exportovat – zaškrtněte leady nebo upravte filtr data.'); return; }
         const rows = leads.map(l => ({
             'Název': l.name || '',
-            'Stav': l.excluded ? 'vyřazený' : 'aktivní',
+            'Ověřený zápis': l.verified === 'yes' ? 'ověřen' : (l.verified === 'no' ? 'neověřen' : ''),
             'Hvězdy (1–5)': l.stars || '',
             'Přidáno': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : '',
             'Kontaktní osoba': l.person || '',
@@ -1073,7 +1069,10 @@
         document.getElementById('modal-web').value = lead ? (lead.web || '') : '';
         document.getElementById('modal-note').value = lead ? (lead.note || '') : '';
         state.modalStars = lead ? (lead.stars || 0) : 0;
+        starHover = 0;
         renderModalStars();
+        state.modalVerified = lead ? (lead.verified || '') : '';
+        renderVerified();
         document.getElementById('modal-remove').classList.toggle('hidden', !lead);
         document.getElementById('profile-modal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
@@ -1095,12 +1094,21 @@
             'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',menubar=no,toolbar=no,location=no,status=no');
         if (!win) showToast('Prohlížeč zablokoval vyskakovací okno – povolte je pro tuto stránku a zkuste to znovu.');
     }
+    let starHover = 0;
     function renderModalStars() {
+        const shown = starHover || state.modalStars;
         document.getElementById('modal-stars').innerHTML = [1, 2, 3, 4, 5].map(i =>
-            `<button type="button" onclick="setStars(${i})" class="text-lg leading-none ${i <= state.modalStars ? 'text-amber-400' : 'text-gray-200'} hover:text-amber-300 transition"><i class="fa-solid fa-star"></i></button>`
+            `<button type="button" onclick="setStars(${i})" onmouseenter="hoverStars(${i})" class="text-lg leading-none ${i <= shown ? 'text-amber-400' : 'text-gray-200'} transition"><i class="fa-solid fa-star"></i></button>`
         ).join('');
     }
-    function setStars(n) { state.modalStars = (state.modalStars === n) ? 0 : n; renderModalStars(); }
+    function hoverStars(n) { starHover = n; renderModalStars(); }
+    function setStars(n) { state.modalStars = (state.modalStars === n) ? 0 : n; starHover = 0; renderModalStars(); }
+    function renderVerified() {
+        const y = document.getElementById('ver-yes'), n = document.getElementById('ver-no');
+        y.className = 'py-1.5 px-3 transition ' + (state.modalVerified === 'yes' ? 'bg-brand-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50');
+        n.className = 'py-1.5 px-3 transition border-l border-gray-200 ' + (state.modalVerified === 'no' ? 'bg-red-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50');
+    }
+    function setVerified(v) { state.modalVerified = (state.modalVerified === v) ? '' : v; renderVerified(); }
     function saveLead() {
         const id = state.modalId;
         if (!id) return;
@@ -1119,7 +1127,7 @@
             area: row ? row.area : (prev ? prev.area : ''),
             distM: row ? row.distM : (prev ? prev.distM : null),
             cats: row ? row.cats : (prev ? prev.cats : []),
-            excluded: prev ? !!prev.excluded : false,
+            verified: state.modalVerified,
             savedAt: prev ? prev.savedAt : Date.now()
         });
         persistLeads();
@@ -1138,39 +1146,6 @@
         showToast('Lead odebrán ze seznamu.');
     }
 
-    // ===================== DIAGNOSTIKA =====================
-    async function runDiagnostics() {
-        showToast('Testuji připojení k API…');
-        const lines = ['DIAGNOSTIKA API (' + location.origin + ')'];
-        lines.push(window.google && window.google.maps
-            ? '✓ Maps JavaScript API: načteno'
-            : '✗ Maps JavaScript API: nenačteno — klíč je neplatný, nebo doména ' + location.hostname + ' není v povolených refererech.');
-        try {
-            const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY },
-                body: JSON.stringify({ input: 'Kolín', languageCode: 'cs', includedRegionCodes: ['cz'] })
-            });
-            if (r.ok) lines.push('✓ Places API (New) – našeptávač: OK');
-            else { const e = await r.json().catch(() => ({})); lines.push('✗ Places API (New) – našeptávač: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || '')); }
-        } catch (e) { lines.push('✗ Places API (New) – našeptávač: ' + e.message); }
-        try {
-            const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY, 'X-Goog-FieldMask': 'places.id' },
-                body: JSON.stringify({ textQuery: 'restaurace Kolín', pageSize: 1, languageCode: 'cs' })
-            });
-            if (r.ok) lines.push('✓ Places API (New) – hledání zápisů: OK');
-            else { const e = await r.json().catch(() => ({})); lines.push('✗ Places API (New) – hledání zápisů: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || '')); }
-        } catch (e) { lines.push('✗ Places API (New) – hledání zápisů: ' + e.message); }
-
-        const txt = lines.join('\n');
-        let hint = '';
-        if (/has not been used|is disabled|SERVICE_DISABLED/i.test(txt)) hint = '\n\nŘEŠENÍ: V Cloud Console povolte „Places API (New)" — console.cloud.google.com/apis/library/places.googleapis.com → Enable.';
-        else if (/referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)) hint = '\n\nŘEŠENÍ: Přidejte do Website restrictions klíče položku https://' + location.hostname + '/* (s hvězdičkou, bez cesty).';
-        else if (/API key not valid/i.test(txt)) hint = '\n\nŘEŠENÍ: Klíč je neplatný — zkontrolujte, že je vložený celý a správně.';
-        showApiError(lines.every(l => !l.startsWith('✗')) ? txt + '\n\nVšechny testy prošly.' : txt + hint);
-    }
 
     // ===================== MAPS JS API (jen geokódování) =====================
     let mapsReadyResolve;
