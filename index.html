@@ -60,6 +60,15 @@
                 <i class="fa-solid fa-star w-5 text-center"></i> Můj seznam <span id="nav-mylist-count" class="badge b-green ml-auto">0</span>
             </button>
 
+            <div class="mx-3 mt-6 card-minimal !shadow-none p-3 text-xs">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Obchodník</p>
+                <div class="flex items-center justify-between gap-2">
+                    <span id="user-name" class="font-semibold text-gray-800 truncate">–</span>
+                    <button onclick="changeUser()" class="text-brand-600 font-semibold hover:underline shrink-0">změnit</button>
+                </div>
+                <p id="sync-status" class="text-[10px] text-gray-400 mt-1 leading-relaxed"></p>
+            </div>
+
         </nav>
         <div class="p-4 border-t border-border bg-gray-50">
             <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
@@ -192,6 +201,10 @@
                     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
                         <h2 class="text-sm font-bold text-gray-900"><i class="fa-solid fa-star text-amber-400 mr-1.5"></i>Můj seznam leadů <span id="mylist-count" class="badge b-gray">0</span></h2>
                         <span class="flex-1"></span>
+                        <select id="ml-scope" onchange="renderMyList()" class="p-1.5 border border-gray-300 rounded-lg text-xs outline-none bg-white cursor-pointer">
+                            <option value="mine" selected>moje leady</option>
+                            <option value="all">celý tým</option>
+                        </select>
                         <label class="text-xs text-gray-500 flex items-center gap-1.5">přidáno od <input type="date" id="ml-from" onchange="renderMyList()" class="p-1.5 border border-gray-300 rounded-lg text-xs outline-none"></label>
                         <label class="text-xs text-gray-500 flex items-center gap-1.5">do <input type="date" id="ml-to" onchange="renderMyList()" class="p-1.5 border border-gray-300 rounded-lg text-xs outline-none"></label>
                         <button onclick="exportXlsx()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5" title="Exportují se zaškrtnuté leady; když není zaškrtnutý žádný, exportuje se vše, co odpovídá filtru data.">
@@ -228,6 +241,7 @@
         <div class="absolute inset-x-3 top-4 bottom-4 sm:inset-x-auto sm:left-4 sm:w-[470px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div class="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3 shrink-0">
                 <h3 class="font-bold text-gray-900 text-sm">Náhled firemního profilu</h3>
+                <span id="modal-owner" class="badge b-gray hidden"></span>
                 <button onclick="openFullProfile()" class="inline-flex items-center gap-1.5 border border-brand-500 text-brand-600 rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-50 transition"><i class="fa-solid fa-window-restore"></i> Celý profil v okně</button>
                 <span class="flex-1"></span>
                 <button onclick="closeProfile()" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"><i class="fa-solid fa-xmark"></i></button>
@@ -291,7 +305,11 @@
     </div>
 
     <!-- POZOR: tento klíč zatím NEMÁ doménovou restrikci – po ověření funkčnosti mu v Cloud Console nastavte Website restriction https://gerbertomas-glitch.github.io/* -->
-    <script> const API_KEY = "AIzaSyA4ncGTpc08O0idb_ykqhYoF0742_tvu_U"; </script>
+    <script>
+        const API_KEY = "AIzaSyA4ncGTpc08O0idb_ykqhYoF0742_tvu_U";
+        // URL webové aplikace Apps Script (sdílená týmová paměť). Prázdné = aplikace běží jen lokálně.
+        const SYNC_URL = "https://script.google.com/macros/s/AKfycbzuowjaUPm2WCKkugLZMzC1rRWQdq-9LZ85NusgTgXp4--BkyFG6Obdl5_6vq-QVkVI/exec";
+    </script>
     <script>
     // ===================== API KEY (#apikey=... v URL) =====================
     const API_KEY_OVERRIDE = (() => { try { return new URLSearchParams(location.hash.replace(/^#/, '')).get('apikey'); } catch (e) { return null; } })();
@@ -396,8 +414,9 @@
         counters: { free: 0, geo: 0, ac: 0 },
         busy: false,
         cancel: false,
-        myLeads: new Map(),
-        excluded: new Set(),
+        myLeads: new Map(),      // id -> karta leadu (celý tým; vlastník v poli owner)
+        excluded: new Map(),     // id -> { by: jméno obchodníka }
+        user: '',
         modalId: null,
         modalStars: 0,
         modalVerified: '',
@@ -649,6 +668,7 @@
         prog.classList.remove('hidden');
         try {
             progText.textContent = 'Připravuji oblast…';
+            try { if (SYNC_URL) { await syncFetchAll(); renderMyList(); } } catch (e) { /* offline – pojede se z lokální kopie */ }
             const geo = await resolveCenter();
             state.lastGeo = geo;
             const area = computeArea(geo);
@@ -891,9 +911,12 @@
             if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu <span class="text-gray-300">· přesnost ±${r.accM} m</span>`;
             else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
             const saved = state.myLeads.get(r.id);
-            const isExc = state.excluded.has(r.id);
-            const savedBadge = (isExc ? '<span class="badge b-red"><i class="fa-solid fa-ban"></i> vyřazený</span> ' : '')
-                + (saved ? `<span class="badge b-green"><i class="fa-solid fa-star"></i> ${(saved.stars || '–')}/5 v seznamu</span>${saved.name ? ' <span class="text-gray-500 font-medium">' + esc(saved.name) + '</span>' : ''} ` : '');
+            const exc = state.excluded.get(r.id);
+            const isExc = !!exc;
+            const excBy = exc && exc.by && exc.by !== state.user ? ' · ' + esc(exc.by) : '';
+            const mine = saved && (!saved.owner || saved.owner === state.user);
+            const savedBadge = (isExc ? '<span class="badge b-red"><i class="fa-solid fa-ban"></i> vyřazený' + excBy + '</span> ' : '')
+                + (saved ? `<span class="badge ${mine ? 'b-green' : 'b-gray'}"><i class="fa-solid fa-star"></i> ${(saved.stars || '–')}/5 ${mine ? 'v mém seznamu' : 'v seznamu · ' + esc(saved.owner)}</span>${saved.name ? ' <span class="text-gray-500 font-medium">' + esc(saved.name) + '</span>' : ''} ` : '');
             return `<tr class="border-b transition align-top ${isExc ? 'bg-red-50/80 border-red-100 hover:bg-red-50' : 'border-gray-50 hover:bg-gray-50/60'}">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
@@ -942,18 +965,91 @@
         try {
             const s = localStorage.getItem('vlf-leads');
             if (s) JSON.parse(s).forEach(l => {
-                if (l.excluded) { state.excluded.add(l.id); return; } // migrace staršího formátu
+                if (l.excluded) { state.excluded.set(l.id, { by: l.owner || state.user }); return; } // migrace nejstaršího formátu
                 state.myLeads.set(l.id, l);
             });
             const e = localStorage.getItem('vlf-excluded');
-            if (e) JSON.parse(e).forEach(id => state.excluded.add(id));
+            if (e) JSON.parse(e).forEach(item => {
+                if (typeof item === 'string') state.excluded.set(item, { by: state.user }); // starší formát (jen id)
+                else if (item && item[0]) state.excluded.set(item[0], item[1] || { by: '' });
+            });
         } catch (err) { /* úložiště nedostupné – poběží jen v paměti */ }
     }
     function persistLeads() {
         try {
             localStorage.setItem('vlf-leads', JSON.stringify([...state.myLeads.values()]));
-            localStorage.setItem('vlf-excluded', JSON.stringify([...state.excluded]));
+            localStorage.setItem('vlf-excluded', JSON.stringify([...state.excluded.entries()]));
         } catch (e) {}
+    }
+
+    // ===================== SDÍLENÁ TÝMOVÁ PAMĚŤ (Apps Script + Google tabulka) =====================
+    function initUser() {
+        try { state.user = localStorage.getItem('vlf-user') || ''; } catch (e) {}
+        if (!state.user) changeUser(true);
+        renderUser();
+    }
+    function changeUser(first) {
+        const v = prompt(first ? 'Vítejte! Zadejte své jméno (uvidí ho kolegové u vašich leadů a vyřazených zápisů):' : 'Změnit jméno obchodníka:', state.user || '');
+        if (v && v.trim()) {
+            state.user = v.trim();
+            try { localStorage.setItem('vlf-user', state.user); } catch (e) {}
+        }
+        renderUser();
+    }
+    function renderUser() {
+        document.getElementById('user-name').textContent = state.user || 'nezadáno';
+        document.getElementById('sync-status').textContent = SYNC_URL ? 'sdílený týmový seznam: zapnuto' : 'sdílený seznam: nenastaveno (SYNC_URL) – data jen ve vašem prohlížeči';
+    }
+    function leadToRecord(l) {
+        return {
+            id: l.id, obchodnik: l.owner || state.user, posledni_uprava_od: state.user,
+            nazev: l.name || '', kontaktni_osoba: l.person || '', telefon: l.phone || '', telefon2: l.phone2 || '',
+            web: l.web || '', email: l.email || '', poznamka: l.note || '', hvezdy: l.stars || 0,
+            overeny: l.verified === 'yes' ? 'ověřen' : (l.verified === 'no' ? 'neověřen' : ''),
+            oblast: l.area || '', vzdalenost_km: l.distM != null ? Number((l.distM / 1000).toFixed(2)) : '',
+            nalezeno_pres: (l.cats || []).join(', '), savedAt: l.savedAt || Date.now()
+        };
+    }
+    function recordToLead(r) {
+        return {
+            id: r.id, owner: r.obchodnik || '', name: r.nazev || '', person: r.kontaktni_osoba || '',
+            phone: r.telefon || '', phone2: r.telefon2 || '', web: r.web || '', email: r.email || '',
+            note: r.poznamka || '', stars: Number(r.hvezdy) || 0,
+            verified: r.overeny === 'ověřen' ? 'yes' : (r.overeny === 'neověřen' ? 'no' : ''),
+            area: r.oblast || '', distM: r.vzdalenost_km !== '' && r.vzdalenost_km != null ? Math.round(Number(r.vzdalenost_km) * 1000) : null,
+            cats: r.nalezeno_pres ? String(r.nalezeno_pres).split(',').map(s => s.trim()).filter(Boolean) : [],
+            savedAt: Number(r.savedAt) || Date.now()
+        };
+    }
+    function syncPost(payload) {
+        if (!SYNC_URL) return Promise.resolve();
+        return fetch(SYNC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain = bez preflightu, Apps Script to vyžaduje
+            body: JSON.stringify(payload)
+        }).then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.error || ''); })
+          .catch(() => showToast('Synchronizace s týmem se nezdařila – změna je zatím jen u vás.'));
+    }
+    async function syncFetchAll() {
+        if (!SYNC_URL) return false;
+        const r = await fetch(SYNC_URL + '?action=all');
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || '');
+        // lokální data, která server ještě nezná (první přihlášení po zavedení sdílení), nahrajeme nahoru
+        const serverIds = new Set((j.rows || []).map(x => String(x.id)));
+        const toUpload = [];
+        state.myLeads.forEach(l => { if (!serverIds.has(String(l.id))) toUpload.push(leadToRecord(l)); });
+        state.excluded.forEach((v, id) => { if (!serverIds.has(String(id))) toUpload.push({ id, vyrazeno: true, vyradil: v.by || state.user }); });
+        if (toUpload.length) await syncPost({ action: 'bulk', records: toUpload });
+        // stav ze serveru = pravda pro celý tým
+        state.myLeads.clear();
+        state.excluded.clear();
+        (j.rows || []).forEach(row => {
+            if (String(row.vyrazeno) === 'true' || row.vyrazeno === true) state.excluded.set(String(row.id), { by: row.vyradil || '' });
+            if (row.savedAt) state.myLeads.set(String(row.id), recordToLead(row));
+        });
+        persistLeads();
+        return true;
     }
     function scrollToMyList() {
         if (!state.myLeads.size) { showToast('Seznam je zatím prázdný – přidejte lead přes „zobrazit profil".'); return; }
@@ -968,6 +1064,7 @@
         const from = document.getElementById('ml-from').value ? new Date(document.getElementById('ml-from').value + 'T00:00:00').getTime() : null;
         const to = document.getElementById('ml-to').value ? new Date(document.getElementById('ml-to').value + 'T23:59:59').getTime() : null;
         let leads = [...state.myLeads.values()];
+        if (document.getElementById('ml-scope').value === 'mine') leads = leads.filter(l => !l.owner || l.owner === state.user);
         if (from != null) leads = leads.filter(l => (l.savedAt || 0) >= from);
         if (to != null) leads = leads.filter(l => (l.savedAt || 0) <= to);
         leads.sort((a, b) => (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
@@ -979,7 +1076,7 @@
     function renderMyList() {
         const all = [...state.myLeads.values()];
         const leads = mlFiltered();
-        document.getElementById('nav-mylist-count').textContent = all.length;
+        document.getElementById('nav-mylist-count').textContent = all.filter(l => !l.owner || l.owner === state.user).length;
         document.getElementById('mylist-count').textContent = leads.length === all.length ? all.length : leads.length + ' / ' + all.length;
         document.getElementById('mylist-card').classList.toggle('hidden', all.length === 0);
         const selCount = leads.filter(l => l.sel).length;
@@ -991,6 +1088,7 @@
                 <p class="text-sm font-semibold text-gray-900">${esc(l.name || '') || 'Firemní zápis'}</p>
                 <p class="text-[11px] text-gray-400">${esc(l.area || '')}${l.distM != null ? ' · ≈ ' + fmtKm(l.distM) + ' km' : ''}</p>
                 <p class="text-[11px] text-gray-400">${esc((l.cats || []).slice(0, 3).join(', '))}</p>
+                ${l.owner && l.owner !== state.user ? '<p class="text-[11px] font-semibold text-gray-500 mt-0.5"><i class="fa-regular fa-user mr-1"></i>' + esc(l.owner) + '</p>' : ''}
             </td>
             <td class="px-2 py-3 text-xs text-gray-500 whitespace-nowrap">${fmtDate(l.savedAt)}</td>
             <td class="px-2 py-3 text-sm text-gray-800">${esc(l.person || '') || '<span class="text-gray-300">–</span>'}</td>
@@ -1007,18 +1105,23 @@
     function quickExclude(id) {
         if (state.excluded.has(id)) {
             state.excluded.delete(id);
-            showToast('Zápis vrácen mezi aktivní.');
+            syncPost({ action: 'upsert', record: { id, vyrazeno: false, vyradil: '', posledni_uprava_od: state.user } });
+            showToast('Zápis vrácen mezi aktivní (uvidí celý tým).');
         } else {
-            state.excluded.add(id);
-            showToast('Zápis vyřazen – při příštím skenu oblasti bude označený červeně.');
+            state.excluded.set(id, { by: state.user });
+            syncPost({ action: 'upsert', record: { id, vyrazeno: true, vyradil: state.user, posledni_uprava_od: state.user } });
+            showToast('Zápis vyřazen – uvidí to i kolegové při skenu této oblasti.');
         }
         persistLeads();
         renderTable();
     }
     function deleteLead(id) {
-        if (!confirm('Odebrat tento lead ze seznamu?')) return;
+        const l = state.myLeads.get(id);
+        if (l && l.owner && l.owner !== state.user && !confirm('Tento lead založil ' + l.owner + '. Opravdu ho odebrat za celý tým?')) return;
+        if ((!l || !l.owner || l.owner === state.user) && !confirm('Odebrat tento lead ze seznamu?')) return;
         state.myLeads.delete(id);
         persistLeads();
+        syncPost({ action: 'clearLead', id });
         renderMyList();
         renderTable();
         showToast('Lead odebrán.');
@@ -1031,6 +1134,7 @@
         if (!leads.length) { showToast('Není co exportovat – zaškrtněte leady nebo upravte filtr data.'); return; }
         const rows = leads.map(l => ({
             'Název': l.name || '',
+            'Obchodník': l.owner || state.user,
             'Ověřený zápis': l.verified === 'yes' ? 'ověřen' : (l.verified === 'no' ? 'neověřen' : ''),
             'Hvězdy (1–5)': l.stars || '',
             'Přidáno': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : '',
@@ -1073,6 +1177,9 @@
         renderModalStars();
         state.modalVerified = lead ? (lead.verified || '') : '';
         renderVerified();
+        const ownerEl = document.getElementById('modal-owner');
+        if (lead && lead.owner && lead.owner !== state.user) { ownerEl.textContent = 'lead založil: ' + lead.owner; ownerEl.classList.remove('hidden'); }
+        else ownerEl.classList.add('hidden');
         document.getElementById('modal-remove').classList.toggle('hidden', !lead);
         document.getElementById('profile-modal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
@@ -1128,9 +1235,11 @@
             distM: row ? row.distM : (prev ? prev.distM : null),
             cats: row ? row.cats : (prev ? prev.cats : []),
             verified: state.modalVerified,
+            owner: prev ? (prev.owner || state.user) : state.user,
             savedAt: prev ? prev.savedAt : Date.now()
         });
         persistLeads();
+        syncPost({ action: 'upsert', record: leadToRecord(state.myLeads.get(id)) });
         renderMyList();
         renderTable();
         closeProfile();
@@ -1159,15 +1268,25 @@
     })();
 
     // ===================== INIT =====================
+    async function initSync() {
+        try {
+            const ok = await syncFetchAll();
+            if (ok) { renderMyList(); renderTable(); document.getElementById('sync-status').textContent = 'sdílený týmový seznam: připojeno'; }
+        } catch (e) {
+            document.getElementById('sync-status').textContent = 'sdílený seznam: nedostupný (offline) – data jen ve vašem prohlížeči';
+        }
+    }
     function onCountryChange() {
         state.lastGeo = null;
         document.getElementById('query-count').textContent = (QUERY_SETS[document.getElementById('inp-country').value] || QUERY_SETS.cz).length;
     }
     document.getElementById('inp-country').addEventListener('change', onCountryChange);
     onCountryChange();
+    initUser();
     safeLoadLeads();
     renderMyList();
     ensureMap();
+    initSync();
     </script>
 </body>
 </html>
