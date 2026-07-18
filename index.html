@@ -126,20 +126,9 @@
                         </button>
                     </div>
 
-                    <div class="mt-5 pt-4 border-t border-gray-100">
-                        <div class="flex items-center justify-between mb-2.5 flex-wrap gap-2">
-                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Kategorie (obory)</p>
-                            <div class="flex items-center gap-3 text-xs">
-                                <span class="text-brand-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>hledání je zdarma bez limitu</span>
-                                <button onclick="setAllCats(true)" class="text-brand-600 font-semibold hover:underline">vše</button>
-                                <button onclick="setAllCats(false)" class="text-gray-500 font-semibold hover:underline">nic</button>
-                            </div>
-                        </div>
-                        <div id="cat-chips" class="flex flex-wrap gap-1.5"></div>
-                        <div class="mt-3 flex items-start gap-2">
-                            <input id="inp-custom-cat" type="text" placeholder="vlastní obor (např. solárium)…" class="p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-56" onkeydown="if(event.key==='Enter')addCustomCat()">
-                            <button onclick="addCustomCat()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Přidat</button>
-                        </div>
+                    <div class="mt-5 pt-4 border-t border-gray-100 flex items-start gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 text-sm"><i class="fa-solid fa-layer-group"></i></div>
+                        <p class="text-xs text-gray-500 leading-relaxed">Aplikace automaticky projede <strong class="text-gray-700">celou sadu oborů a obecných výrazů</strong> (<span id="query-count">–</span> dotazů), aby zachytila co nejvíc firemních zápisů v oblasti. Hledání je zdarma bez limitu, u větších měst zabere jen o něco déle. Duplicity se slučují automaticky.</p>
                     </div>
                     <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2"><i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span></div>
                 </div>
@@ -170,7 +159,7 @@
                                     <th class="px-4 py-3 w-8"><input type="checkbox" id="chk-all" onchange="toggleAll(this.checked)"></th>
                                     <th class="px-2 py-3 w-10">#</th>
                                     <th class="px-2 py-3">Firemní zápis</th>
-                                    <th class="px-2 py-3">Kategorie</th>
+                                    <th class="px-2 py-3">Nalezeno přes</th>
                                     <th class="px-2 py-3">Virtuálka</th>
                                     <th class="px-4 py-3 text-right">Odkaz na zápis</th>
                                 </tr>
@@ -185,7 +174,7 @@
                 <div id="empty-state" class="card-minimal p-10 text-center">
                     <div class="w-14 h-14 mx-auto rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-map-location-dot"></i></div>
                     <h2 class="font-bold text-gray-900 mb-1.5">Najděte firemní zápisy v oblasti</h2>
-                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec, vyberte obory a získáte seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu. Pak doplňte adresy, ověřte virtuálky a vyfiltrujte firmy, které virtuálku nemají. Telefon a web obchodník uvidí po kliknutí na zápis.</p>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec a získáte seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu. Pak doplňte adresy, ověřte virtuálky a vyfiltrujte firmy, které virtuálku nemají. Telefon a web obchodník uvidí po kliknutí na zápis.</p>
                 </div>
 
             </div>
@@ -212,21 +201,37 @@
     }
 
     // ===================== STAV =====================
-    const CATEGORIES = [
-        'restaurace','hospoda','kavárna','cukrárna','pekárna','hotel','penzion','ubytování',
-        'autoservis','pneuservis','autobazar','kadeřnictví','kosmetika','masáže','fitness','wellness',
-        'zubař','lékař','veterinář','lékárna','optika','květinářství','řeznictví','potraviny',
-        'stavebniny','instalatér','elektro','autoškola','realitní kancelář','účetní'
+    // Sada dotazů, kterou aplikace automaticky projede, aby zachytila co nejvíc zápisů v oblasti.
+    const ALL_QUERIES = [
+        // obecné výrazy
+        'firma','firmy','obchod','prodejna','služby','výroba','velkoobchod','kancelář','řemeslník',
+        // jídlo a pití
+        'restaurace','hospoda','pivnice','kavárna','cukrárna','pekárna','bistro','pizzerie','rychlé občerstvení','catering','vinárna','bar',
+        // ubytování
+        'hotel','penzion','ubytování','apartmány','kemp',
+        // auto-moto
+        'autoservis','pneuservis','autobazar','autodíly','myčka aut','čerpací stanice','autoškola','autopůjčovna','taxi','autodoprava',
+        // krása a zdraví
+        'kadeřnictví','holičství','kosmetika','nehtové studio','masáže','solárium','tetování','fitness','wellness','sauna',
+        'lékař','zubař','veterinář','lékárna','optika','fyzioterapie',
+        // obchody
+        'potraviny','večerka','řeznictví','ovoce zelenina','květinářství','drogerie','papírnictví','knihkupectví','hračkářství',
+        'oblečení','obuv','klenotnictví','elektro','nábytek','železářství','stavebniny','zahradnictví','chovatelské potřeby','trafika','second hand',
+        // řemesla a služby
+        'instalatér','elektrikář','malíř','zámečník','truhlář','pokrývač','kominík','sklenář','stěhování','čistírna','prádelna','opravna','úklidové služby',
+        // profesní služby
+        'účetní','právník','advokát','notář','realitní kancelář','pojišťovna','banka','finanční poradce','IT služby','reklamní agentura','tiskárna','fotograf',
+        // volný čas a ostatní
+        'školka','škola','sportovní hala','bazén','bowling','kino','muzeum','galerie','farma','vinařství','pivovar','zámečnictví','kovovýroba','zemědělské družstvo'
     ];
-    const DEFAULT_ON = new Set(['restaurace','hospoda','kavárna','hotel','penzion','autoservis','kadeřnictví','fitness']);
 
     const state = {
-        cats: new Set(DEFAULT_ON),
         results: new Map(),      // placeId -> row
         geoCache: new Map(),
         counters: { free: 0, sv: 0, addr: 0, geo: 0 },
         busy: false
     };
+    document.getElementById('query-count').textContent = ALL_QUERIES.length;
 
     // ===================== UI HELPERS =====================
     let toastTimer = null;
@@ -256,24 +261,6 @@
         document.getElementById('cnt-sv').textContent = state.counters.sv;
         document.getElementById('cnt-addr').textContent = state.counters.addr;
         document.getElementById('cnt-geo').textContent = state.counters.geo;
-    }
-
-    // ===================== KATEGORIE =====================
-    function renderCats() {
-        const wrap = document.getElementById('cat-chips');
-        const all = [...new Set([...CATEGORIES, ...state.cats])];
-        wrap.innerHTML = all.map(c =>
-            `<span class="cat-chip ${state.cats.has(c) ? 'on' : ''}" onclick="toggleCat('${esc(c).replace(/'/g, "\\'")}')">${esc(c)}</span>`
-        ).join('');
-    }
-    function toggleCat(c) { state.cats.has(c) ? state.cats.delete(c) : state.cats.add(c); renderCats(); }
-    function setAllCats(on) { state.cats = on ? new Set([...CATEGORIES, ...state.cats]) : new Set(); renderCats(); }
-    function addCustomCat() {
-        const inp = document.getElementById('inp-custom-cat');
-        const v = inp.value.trim().toLowerCase();
-        if (!v) return;
-        state.cats.add(v); inp.value = '';
-        renderCats();
     }
 
     // ===================== GEOKÓDOVÁNÍ OBCE =====================
@@ -335,7 +322,6 @@
         if (state.busy) return;
         const place = document.getElementById('inp-place').value.trim();
         if (!place) { showToast('Zadejte obec nebo město.'); return; }
-        if (!state.cats.size) { showToast('Vyberte alespoň jednu kategorii.'); return; }
         const maxPages = parseInt(document.getElementById('inp-pages').value, 10);
         state.busy = true;
         setSearchBusy(true);
@@ -346,11 +332,10 @@
             const geo = await geocodePlace(place);
             const radiusSel = document.getElementById('inp-radius').value;
             const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
-            const cats = [...state.cats];
             let added = 0, i = 0;
-            for (const cat of cats) {
+            for (const cat of ALL_QUERIES) {
                 i++;
-                progText.textContent = `(${i}/${cats.length}) ${cat} – ${geo.label}`;
+                progText.textContent = `${Math.round(i / ALL_QUERIES.length * 100)} % · „${cat}" – ${geo.label} · zatím ${state.results.size} zápisů`;
                 let token = null, page = 0;
                 do {
                     page++;
@@ -376,6 +361,7 @@
                     });
                     token = data.nextPageToken || null;
                 } while (token && page < maxPages);
+                if (i % 10 === 0) renderTable();
             }
             showToast(added ? `Přidáno ${added} nových zápisů (celkem ${state.results.size}).` : 'Nenašly se žádné nové zápisy.');
             renderTable();
@@ -529,7 +515,7 @@
         const sel = all.filter(r => r.selected);
         const rows = sel.length ? sel : all;
         if (!rows.length) { showToast('Není co exportovat.'); return; }
-        const head = ['Kategorie', 'Adresa', 'Oblast', 'Virtuálka', 'Odkaz na zápis'];
+        const head = ['Nalezeno přes', 'Adresa', 'Oblast', 'Virtuálka', 'Odkaz na zápis'];
         const line = r => [
             r.cats.join(', '), r.address, r.area || '',
             r.tour === 'yes' ? 'má' : (r.tour === 'no' ? 'nemá' : 'neověřeno'),
@@ -555,7 +541,7 @@
     })();
 
     // ===================== INIT =====================
-    renderCats();
+    // init hotov
     </script>
 </body>
 </html>
