@@ -1209,12 +1209,8 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.modalId) closeProfile(); });
     function openFullProfile() {
         if (!state.modalId) return;
-        const w = Math.min(600, Math.round(screen.width * 0.5));
-        const h = Math.round(screen.height * 0.9);
-        const left = Math.round((screen.width - w) / 2), top = Math.round(screen.height * 0.04);
-        const win = window.open(mapsLink(state.modalId), 'vlf-profil',
-            'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',menubar=no,toolbar=no,location=no,status=no');
-        if (!win) showToast('Prohlížeč zablokoval vyskakovací okno – povolte je pro tuto stránku a zkuste to znovu.');
+        // otevře se jako nová záložka ve stávajícím okně prohlížeče
+        window.open(mapsLink(state.modalId), '_blank', 'noopener');
     }
     let starHover = 0;
     function renderModalStars() {
