@@ -172,7 +172,6 @@
                             <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                             <input id="flt-text" type="text" placeholder="filtrovat…" oninput="renderTable()" class="pl-8 p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-40">
                         </div>
-                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zvolená oblast <span id="flt-town-note" class="text-gray-400 font-normal"></span></label>
                         <span class="flex-1"></span>
                         <button onclick="exportCsv()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
@@ -203,15 +202,19 @@
                     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
                         <h2 class="text-sm font-bold text-gray-900"><i class="fa-solid fa-star text-amber-400 mr-1.5"></i>Můj seznam leadů <span id="mylist-count" class="badge b-gray">0</span></h2>
                         <span class="flex-1"></span>
-                        <button onclick="exportXlsx()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
-                            <i class="fa-solid fa-file-excel"></i> Export XLS
+                        <label class="text-xs text-gray-500 flex items-center gap-1.5">přidáno od <input type="date" id="ml-from" onchange="renderMyList()" class="p-1.5 border border-gray-300 rounded-lg text-xs outline-none"></label>
+                        <label class="text-xs text-gray-500 flex items-center gap-1.5">do <input type="date" id="ml-to" onchange="renderMyList()" class="p-1.5 border border-gray-300 rounded-lg text-xs outline-none"></label>
+                        <button onclick="exportXlsx()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5" title="Exportují se zaškrtnuté leady; když není zaškrtnutý žádný, exportuje se vše, co odpovídá filtru data.">
+                            <i class="fa-solid fa-file-excel"></i> Export XLS <span id="ml-export-count" class="badge b-gray">0</span>
                         </button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm min-w-[980px]">
                             <thead>
                                 <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                                    <th class="px-4 py-3">Lead</th>
+                                    <th class="px-4 py-3 w-8"><input type="checkbox" id="ml-chk-all" onchange="mlToggleAll(this.checked)"></th>
+                                    <th class="px-2 py-3">Lead</th>
+                                    <th class="px-2 py-3">Přidáno</th>
                                     <th class="px-2 py-3">Kontaktní osoba</th>
                                     <th class="px-2 py-3">Telefon</th>
                                     <th class="px-2 py-3">Web</th>
@@ -248,6 +251,10 @@
                         <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký lead</span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Název zápisu (vlastní pojmenování)</label>
+                            <input id="modal-name" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="např. Restaurace U Lípy – Podolánka">
+                        </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Kontaktní osoba</label>
                             <input id="modal-person" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="Jan Novák">
@@ -255,6 +262,10 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Telefon</label>
                             <input id="modal-phone" type="tel" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="+420 …">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Telefon 2</label>
+                            <input id="modal-phone2" type="tel" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="+420 …">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">E-mail</label>
@@ -710,11 +721,10 @@
                 renderTable();
             }
 
-            const outOfTown = [...state.results.values()].filter(r => r.inTown === false).length;
             if (failCount > 0 && lastErr) showApiError('Část dotazů selhala (' + failCount + '). Poslední chyba: ' + (lastErr.message || ''));
             showToast(state.cancel
                 ? 'Sken zastaven – zobrazeny dosavadní výsledky.'
-                : (added ? `Přidáno ${added} nových zápisů` + (outOfTown ? `, z toho ${outOfTown} mimo oblast (skryto filtrem)` : '') + '.' : 'Nenašly se žádné nové zápisy.'));
+                : (added ? `Přidáno ${added} nových zápisů.` : 'Nenašly se žádné nové zápisy.'));
         } catch (e) {
             showToast(e.message || 'Hledání selhalo.');
         } finally {
@@ -835,7 +845,7 @@
             const m = L.circleMarker([r.loc.lat, r.loc.lng], {
                 radius: 7,
                 color: '#ffffff', weight: 2,
-                fillColor: r.inTown === false ? '#f59e0b' : '#16a34a',
+                fillColor: '#16a34a',
                 fillOpacity: 0.95
             });
             m.bindPopup(`<strong>Firemní zápis #${idx + 1}</strong><br>${esc(r.cats.slice(0, 3).join(', '))}<br>≈ ${fmtKm(r.distM || 0)} km od středu · ±${r.accM} m<br><a href="${mapsLink(r.id)}" target="_blank" rel="noopener">otevřít zápis ↗</a>`);
@@ -846,10 +856,9 @@
     // ===================== TABULKA =====================
     function filteredRows() {
         const q = document.getElementById('flt-text').value.trim().toLowerCase();
-        const onlyTown = document.getElementById('flt-town').checked;
         let rows = [...state.results.values()];
         if (q) rows = rows.filter(r => ((r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
-        if (onlyTown) rows = rows.filter(r => r.inTown !== false);
+        rows = rows.filter(r => r.inTown !== false); // zápisy mimo zvolenou oblast se nezobrazují vůbec
         rows.sort((a, b) => ((a.distM == null ? 1e9 : a.distM) - (b.distM == null ? 1e9 : b.distM)) || a.cats[0].localeCompare(b.cats[0], 'cs'));
         return rows;
     }
@@ -872,16 +881,14 @@
         hc.classList.toggle('hidden', state.results.size === 0);
         hc.classList.toggle('flex', state.results.size > 0);
         document.getElementById('header-count-value').textContent = rows.length === state.results.size ? state.results.size : rows.length + ' / ' + state.results.size;
-        const hiddenTown = document.getElementById('flt-town').checked ? [...state.results.values()].filter(r => r.inTown === false).length : 0;
-        document.getElementById('flt-town-note').textContent = hiddenTown ? '(' + hiddenTown + ' skryto)' : '';
         document.getElementById('results-empty').classList.toggle('hidden', rows.length > 0 || state.results.size === 0);
 
         document.getElementById('results-body').innerHTML = rows.map((r, idx) => {
             let locTxt;
-            if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu <span class="text-gray-300">· přesnost ±${r.accM} m</span>` + (r.inTown === false ? ' <span class="badge b-amber">mimo oblast</span>' : '');
+            if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu <span class="text-gray-300">· přesnost ±${r.accM} m</span>`;
             else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
             const saved = state.myLeads.get(r.id);
-            const savedBadge = saved ? `<span class="badge b-green"><i class="fa-solid fa-star"></i> ${saved.stars || '–'}/5 v seznamu</span> ` : '';
+            const savedBadge = saved ? `<span class="badge ${saved.excluded ? 'b-red' : 'b-green'}"><i class="fa-solid ${saved.excluded ? 'fa-ban' : 'fa-star'}"></i> ${saved.excluded ? 'vyřazený' : (saved.stars || '–') + '/5 v seznamu'}</span>${saved.name ? ' <span class="text-gray-500 font-medium">' + esc(saved.name) + '</span>' : ''} ` : '';
             return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
@@ -943,27 +950,55 @@
         for (let i = 1; i <= 5; i++) s += `<i class="fa-solid fa-star ${i <= n ? 'text-amber-400' : 'text-gray-200'} text-xs"></i>`;
         return s;
     }
+    function mlFiltered() {
+        const from = document.getElementById('ml-from').value ? new Date(document.getElementById('ml-from').value + 'T00:00:00').getTime() : null;
+        const to = document.getElementById('ml-to').value ? new Date(document.getElementById('ml-to').value + 'T23:59:59').getTime() : null;
+        let leads = [...state.myLeads.values()];
+        if (from != null) leads = leads.filter(l => (l.savedAt || 0) >= from);
+        if (to != null) leads = leads.filter(l => (l.savedAt || 0) <= to);
+        // vyřazené až na konec, jinak od nejžhavějších a nejnovějších
+        leads.sort((a, b) => (a.excluded ? 1 : 0) - (b.excluded ? 1 : 0) || (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
+        return leads;
+    }
+    function mlToggleAll(on) { mlFiltered().forEach(l => l.sel = on); renderMyList(); }
+    function mlToggleRow(id, on) { const l = state.myLeads.get(id); if (l) l.sel = on; renderMyList(); }
+    function fmtDate(ts) { return ts ? new Date(ts).toLocaleDateString('cs-CZ') : '–'; }
     function renderMyList() {
-        const leads = [...state.myLeads.values()].sort((a, b) => (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
-        document.getElementById('nav-mylist-count').textContent = leads.length;
-        document.getElementById('mylist-count').textContent = leads.length;
-        document.getElementById('mylist-card').classList.toggle('hidden', leads.length === 0);
-        document.getElementById('mylist-body').innerHTML = leads.map(l => `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
-            <td class="px-4 py-3">
-                <div class="flex items-center gap-1 mb-0.5">${starsHtml(l.stars || 0)}</div>
+        const all = [...state.myLeads.values()];
+        const leads = mlFiltered();
+        document.getElementById('nav-mylist-count').textContent = all.length;
+        document.getElementById('mylist-count').textContent = leads.length === all.length ? all.length : leads.length + ' / ' + all.length;
+        document.getElementById('mylist-card').classList.toggle('hidden', all.length === 0);
+        const selCount = leads.filter(l => l.sel).length;
+        document.getElementById('ml-export-count').textContent = selCount || leads.filter(l => !l.excluded).length;
+        document.getElementById('mylist-body').innerHTML = leads.map(l => `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top ${l.excluded ? 'opacity-50 bg-gray-50/40' : ''}">
+            <td class="px-4 py-3"><input type="checkbox" ${l.sel ? 'checked' : ''} onchange="mlToggleRow('${esc(l.id)}', this.checked)"></td>
+            <td class="px-2 py-3">
+                <div class="flex items-center gap-2 mb-0.5"><span class="flex items-center gap-1">${starsHtml(l.stars || 0)}</span>${l.excluded ? '<span class="badge b-red"><i class="fa-solid fa-ban"></i> vyřazený</span>' : ''}</div>
+                <p class="text-sm font-semibold text-gray-900 ${l.excluded ? 'line-through' : ''}">${esc(l.name || '') || 'Firemní zápis'}</p>
                 <p class="text-[11px] text-gray-400">${esc(l.area || '')}${l.distM != null ? ' · ≈ ' + fmtKm(l.distM) + ' km' : ''}</p>
                 <p class="text-[11px] text-gray-400">${esc((l.cats || []).slice(0, 3).join(', '))}</p>
             </td>
+            <td class="px-2 py-3 text-xs text-gray-500 whitespace-nowrap">${fmtDate(l.savedAt)}</td>
             <td class="px-2 py-3 text-sm text-gray-800">${esc(l.person || '') || '<span class="text-gray-300">–</span>'}</td>
-            <td class="px-2 py-3 text-sm whitespace-nowrap">${l.phone ? '<a href="tel:' + esc(String(l.phone).replace(/\s/g, '')) + '" class="text-gray-800 hover:text-brand-600 font-medium">' + esc(l.phone) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-2 py-3 text-sm whitespace-nowrap">${l.phone ? '<a href="tel:' + esc(String(l.phone).replace(/\s/g, '')) + '" class="text-gray-800 hover:text-brand-600 font-medium">' + esc(l.phone) + '</a>' : '<span class="text-gray-300">–</span>'}${l.phone2 ? '<br><a href="tel:' + esc(String(l.phone2).replace(/\s/g, '')) + '" class="text-gray-600 hover:text-brand-600 text-xs">' + esc(l.phone2) + '</a>' : ''}</td>
             <td class="px-2 py-3 text-xs">${l.web ? '<a href="' + esc(/^https?:/.test(l.web) ? l.web : 'https://' + l.web) + '" target="_blank" rel="noopener" class="text-brand-600 hover:underline break-all">' + esc(String(l.web).replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
             <td class="px-2 py-3 text-sm">${l.email ? '<a href="mailto:' + esc(l.email) + '" class="text-brand-600 hover:underline break-all">' + esc(l.email) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
             <td class="px-2 py-3 text-xs text-gray-500 max-w-[220px]">${esc(l.note || '') || '<span class="text-gray-300">–</span>'}</td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
                 <button onclick="openProfile('${esc(l.id)}')" class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-regular fa-pen-to-square"></i> upravit</button>
+                <button onclick="toggleExcluded('${esc(l.id)}')" title="${l.excluded ? 'Vrátit mezi aktivní' : 'Označit jako vyřazený'}" class="inline-flex items-center gap-1.5 border ${l.excluded ? 'border-brand-500 text-brand-600 hover:bg-brand-50' : 'border-gray-200 text-gray-500 hover:text-amber-600 hover:border-amber-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${l.excluded ? 'fa-rotate-left' : 'fa-ban'}"></i> ${l.excluded ? 'obnovit' : 'vyřadit'}</button>
                 <button onclick="deleteLead('${esc(l.id)}')" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-300 transition ml-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
             </td>
         </tr>`).join('');
+    }
+    function toggleExcluded(id) {
+        const l = state.myLeads.get(id);
+        if (!l) return;
+        l.excluded = !l.excluded;
+        persistLeads();
+        renderMyList();
+        showToast(l.excluded ? 'Lead označen jako vyřazený.' : 'Lead vrácen mezi aktivní.');
     }
     function deleteLead(id) {
         if (!confirm('Odebrat tento lead ze seznamu?')) return;
@@ -974,23 +1009,29 @@
         showToast('Lead odebrán.');
     }
     function exportXlsx() {
-        const leads = [...state.myLeads.values()].sort((a, b) => (b.stars || 0) - (a.stars || 0));
-        if (!leads.length) { showToast('Seznam je prázdný.'); return; }
+        const filtered = mlFiltered();
+        const sel = filtered.filter(l => l.sel);
+        // export: zaškrtnuté; jinak vše ve filtru data kromě vyřazených
+        const leads = sel.length ? sel : filtered.filter(l => !l.excluded);
+        if (!leads.length) { showToast('Není co exportovat – zaškrtněte leady nebo upravte filtr data.'); return; }
         const rows = leads.map(l => ({
+            'Název': l.name || '',
+            'Stav': l.excluded ? 'vyřazený' : 'aktivní',
             'Hvězdy (1–5)': l.stars || '',
+            'Přidáno': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : '',
             'Kontaktní osoba': l.person || '',
             'Telefon': l.phone || '',
+            'Telefon 2': l.phone2 || '',
             'Web': l.web || '',
             'E-mail': l.email || '',
             'Poznámka': l.note || '',
             'Oblast': l.area || '',
             'Vzdálenost od středu (km)': l.distM != null ? Number((l.distM / 1000).toFixed(1)) : '',
             'Nalezeno přes': (l.cats || []).join(', '),
-            'Odkaz na zápis': mapsLink(l.id),
-            'Uloženo': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : ''
+            'Odkaz na zápis': mapsLink(l.id)
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [{wch:10},{wch:20},{wch:16},{wch:28},{wch:26},{wch:40},{wch:28},{wch:12},{wch:30},{wch:55},{wch:12}];
+        ws['!cols'] = [{wch:28},{wch:9},{wch:10},{wch:11},{wch:20},{wch:16},{wch:16},{wch:28},{wch:26},{wch:40},{wch:28},{wch:12},{wch:30},{wch:55}];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Moje leady');
         XLSX.writeFile(wb, 'moje-leady-' + new Date().toISOString().slice(0, 10) + '.xlsx');
@@ -1005,8 +1046,10 @@
         iframe.src = 'https://www.google.com/maps/embed/v1/place?key=' + EFFECTIVE_API_KEY
             + '&q=place_id:' + encodeURIComponent(id)
             + '&language=' + COUNTRY_META[document.getElementById('inp-country').value].lang;
+        document.getElementById('modal-name').value = lead ? (lead.name || '') : '';
         document.getElementById('modal-person').value = lead ? (lead.person || '') : '';
         document.getElementById('modal-phone').value = lead ? (lead.phone || '') : '';
+        document.getElementById('modal-phone2').value = lead ? (lead.phone2 || '') : '';
         document.getElementById('modal-email').value = lead ? (lead.email || '') : '';
         document.getElementById('modal-web').value = lead ? (lead.web || '') : '';
         document.getElementById('modal-note').value = lead ? (lead.note || '') : '';
@@ -1046,8 +1089,10 @@
         const prev = state.myLeads.get(id);
         state.myLeads.set(id, {
             id,
+            name: document.getElementById('modal-name').value.trim(),
             person: document.getElementById('modal-person').value.trim(),
             phone: document.getElementById('modal-phone').value.trim(),
+            phone2: document.getElementById('modal-phone2').value.trim(),
             web: document.getElementById('modal-web').value.trim(),
             email: document.getElementById('modal-email').value.trim(),
             note: document.getElementById('modal-note').value.trim(),
@@ -1055,13 +1100,14 @@
             area: row ? row.area : (prev ? prev.area : ''),
             distM: row ? row.distM : (prev ? prev.distM : null),
             cats: row ? row.cats : (prev ? prev.cats : []),
+            excluded: prev ? !!prev.excluded : false,
             savedAt: prev ? prev.savedAt : Date.now()
         });
         persistLeads();
         renderMyList();
         renderTable();
         closeProfile();
-        showToast('Lead uložen do seznamu.');
+        showToast(prev ? 'Lead aktualizován – duplicita se nevytváří.' : 'Lead uložen do seznamu.');
     }
     function removeLead() {
         if (!state.modalId) return;
