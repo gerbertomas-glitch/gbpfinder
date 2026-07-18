@@ -195,8 +195,8 @@
         <span id="toast-message" class="text-sm font-medium"></span>
     </div>
 
-    <!-- POZOR: API klíč omezte v Google Cloud Console na vaši doménu (HTTP referrer) + Maps JavaScript API, Places API (New) a Geocoding API -->
-    <script> const API_KEY = "AIzaSyAnwJg7hLl05s-usDuSvrcM3nnu90dRczI"; </script>
+    <!-- POZOR: tento klíč zatím NEMÁ doménovou restrikci – po ověření funkčnosti mu v Cloud Console nastavte Website restriction https://gerbertomas-glitch.github.io/* -->
+    <script> const API_KEY = "AIzaSyA4ncGTpc08O0idb_ykqhYoF0742_tvu_U"; </script>
     <script>
     // ===================== API KEY (#apikey=... v URL funguje stejně jako v Sales Suite) =====================
     const API_KEY_OVERRIDE = (() => { try { return new URLSearchParams(location.hash.replace(/^#/, '')).get('apikey'); } catch (e) { return null; } })();
