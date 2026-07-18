@@ -22,9 +22,6 @@
         .card-minimal { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px 0 rgba(0,0,0,0.02); transition:border-color .2s, box-shadow .2s; }
         .card-minimal:hover { border-color:#d1d5db; box-shadow:0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03); }
         input[type="checkbox"] { accent-color:#16a34a; width:1.05rem; height:1.05rem; cursor:pointer; flex-shrink:0; }
-        .cat-chip { border:1px solid #e5e7eb; background:#fff; color:#374151; border-radius:99px; padding:5px 13px; font-size:12.5px; font-weight:600; cursor:pointer; transition:all .15s; user-select:none; }
-        .cat-chip:hover { border-color:#86efac; }
-        .cat-chip.on { background:#f0fdf4; border-color:#16a34a; color:#166534; }
         .badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; border-radius:99px; padding:2px 8px; white-space:nowrap; }
         .b-green { background:#f0fdf4; color:#15803d; border:1px solid #dcfce7; }
         .b-gray { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
@@ -59,11 +56,10 @@
             <div class="mx-3 card-minimal !shadow-none p-3 text-xs text-gray-600 space-y-1.5">
                 <div class="flex justify-between"><span>Hledání <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-free" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Virtuálky <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-sv" class="text-gray-900">0</strong></div>
-                <div class="flex justify-between"><span>Adresy <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-addr" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Geokódování <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Našeptávač <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-ac" class="text-gray-900">0</strong></div>
             </div>
-            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání a ověření virtuálek jsou zdarma bez limitu. Adresy a geokódování mají měsíční limit zdarma, který se resetuje 1. den v měsíci.</p>
+            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy i ověření virtuálek jsou zdarma bez limitu. Jediné limitované (zdarma do 10 000/měs.) je geokódování obce (1 na hledání) a našeptávač.</p>
         </nav>
         <div class="p-4 border-t border-border bg-gray-50">
             <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
@@ -115,7 +111,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-600 mb-1.5">Okruh</label>
                             <select id="inp-radius" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
-                                <option value="auto" selected>Auto (dle obce)</option>
+                                <option value="auto" selected>Auto (hranice obce)</option>
                                 <option value="1000">1 km</option>
                                 <option value="2000">2 km</option>
                                 <option value="5000">5 km</option>
@@ -123,11 +119,11 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-1.5" title="Každá stránka = až 20 firem na kategorii">Hloubka</label>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5" title="Každá stránka = až 20 firem na dotaz">Hloubka</label>
                             <select id="inp-pages" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
-                                <option value="1">do 20 firem / kat.</option>
-                                <option value="2">do 40 firem / kat.</option>
-                                <option value="3" selected>do 60 firem / kat.</option>
+                                <option value="1">do 20 firem / dotaz</option>
+                                <option value="2">do 40 firem / dotaz</option>
+                                <option value="3" selected>do 60 firem / dotaz</option>
                             </select>
                         </div>
                         <button id="btn-search" onclick="runSearch()" class="bg-brand-500 text-white py-2.5 px-6 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center justify-center gap-2 shrink-0">
@@ -137,9 +133,12 @@
 
                     <div class="mt-5 pt-4 border-t border-gray-100 flex items-start gap-2.5">
                         <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 text-sm"><i class="fa-solid fa-layer-group"></i></div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Aplikace automaticky projede <strong class="text-gray-700">celou sadu oborů a obecných výrazů</strong> (<span id="query-count">–</span> dotazů), aby zachytila co nejvíc firemních zápisů v oblasti. Hledání je zdarma bez limitu, u větších měst zabere jen o něco déle. Duplicity se slučují automaticky.</p>
+                        <p class="text-xs text-gray-500 leading-relaxed">Aplikace automaticky projede <strong class="text-gray-700">celou sadu oborů a obecných výrazů</strong> (<span id="query-count">–</span> dotazů) a poté <strong class="text-gray-700">mřížkovým zpřesňováním určí polohu každé firmy</strong> — díky tomu funguje filtr obce i ověření virtuálek úplně zdarma a bez limitu. U větších obcí zabere sken několik minut; průběžné výsledky se zobrazují hned.</p>
                     </div>
-                    <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2"><i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span></div>
+                    <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span>
+                        <button onclick="cancelSearch()" class="text-red-500 font-semibold hover:underline ml-2">zastavit</button>
+                    </div>
                 </div>
 
                 <!-- RESULTS -->
@@ -152,9 +151,6 @@
                         <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zadaná obec <span id="flt-town-note" class="text-gray-400 font-normal"></span></label>
                         <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-notour" onchange="renderTable()"> jen bez virtuálky</label>
                         <span class="flex-1"></span>
-                        <button onclick="loadAddressesForFiltered()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Doplní adresu a souřadnice (nutné pro ověření virtuálek). Zdarma do 10 000 firem měsíčně.">
-                            <i class="fa-solid fa-location-dot"></i> Doplnit adresy <span id="addr-pending-count" class="badge b-gray">0</span>
-                        </button>
                         <button onclick="checkAllTours()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Zjistí přes Street View metadata (zdarma bez limitu), zda je u firmy nahrané panorama / prohlídka.">
                             <i class="fa-solid fa-street-view"></i> Ověřit virtuálky <span class="badge b-green">zdarma</span>
                         </button>
@@ -166,12 +162,12 @@
                         </button>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm min-w-[760px]">
+                        <table class="w-full text-sm min-w-[820px]">
                             <thead>
                                 <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                                     <th class="px-4 py-3 w-8"><input type="checkbox" id="chk-all" onchange="toggleAll(this.checked)"></th>
                                     <th class="px-2 py-3 w-10">#</th>
-                                    <th class="px-2 py-3">Firemní zápis</th>
+                                    <th class="px-2 py-3">Firemní zápis · poloha</th>
                                     <th class="px-2 py-3">Nalezeno přes</th>
                                     <th class="px-2 py-3">Virtuálka</th>
                                     <th class="px-4 py-3 text-right">Odkaz na zápis</th>
@@ -187,7 +183,7 @@
                 <div id="empty-state" class="card-minimal p-10 text-center">
                     <div class="w-14 h-14 mx-auto rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-map-location-dot"></i></div>
                     <h2 class="font-bold text-gray-900 mb-1.5">Najděte firemní zápisy v oblasti</h2>
-                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec a získáte seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu. Pak doplňte adresy, ověřte virtuálky a vyfiltrujte firmy, které virtuálku nemají. Telefon a web obchodník uvidí po kliknutí na zápis.</p>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec a získáte seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu, pro celý tým. Aplikace určí polohu firem, ověří virtuálky a vyfiltruje ty, které virtuálku nemají. Telefon, web a adresu obchodník uvidí po kliknutí na zápis.</p>
                 </div>
 
             </div>
@@ -202,7 +198,7 @@
     <!-- POZOR: tento klíč zatím NEMÁ doménovou restrikci – po ověření funkčnosti mu v Cloud Console nastavte Website restriction https://gerbertomas-glitch.github.io/* -->
     <script> const API_KEY = "AIzaSyA4ncGTpc08O0idb_ykqhYoF0742_tvu_U"; </script>
     <script>
-    // ===================== API KEY (#apikey=... v URL funguje stejně jako v Sales Suite) =====================
+    // ===================== API KEY (#apikey=... v URL) =====================
     const API_KEY_OVERRIDE = (() => { try { return new URLSearchParams(location.hash.replace(/^#/, '')).get('apikey'); } catch (e) { return null; } })();
     const EFFECTIVE_API_KEY = (API_KEY_OVERRIDE && API_KEY_OVERRIDE.trim()) || API_KEY;
 
@@ -213,36 +209,27 @@
         location.reload();
     }
 
-    // ===================== STAV =====================
-    // Sada dotazů, kterou aplikace automaticky projede, aby zachytila co nejvíc zápisů v oblasti.
+    // ===================== DOTAZY =====================
     const ALL_QUERIES = [
-        // obecné výrazy
         'firma','firmy','obchod','prodejna','služby','výroba','velkoobchod','kancelář','řemeslník',
-        // jídlo a pití
         'restaurace','hospoda','pivnice','kavárna','cukrárna','pekárna','bistro','pizzerie','rychlé občerstvení','catering','vinárna','bar',
-        // ubytování
         'hotel','penzion','ubytování','apartmány','kemp',
-        // auto-moto
         'autoservis','pneuservis','autobazar','autodíly','myčka aut','čerpací stanice','autoškola','autopůjčovna','taxi','autodoprava',
-        // krása a zdraví
         'kadeřnictví','holičství','kosmetika','nehtové studio','masáže','solárium','tetování','fitness','wellness','sauna',
         'lékař','zubař','veterinář','lékárna','optika','fyzioterapie',
-        // obchody
         'potraviny','večerka','řeznictví','ovoce zelenina','květinářství','drogerie','papírnictví','knihkupectví','hračkářství',
         'oblečení','obuv','klenotnictví','elektro','nábytek','železářství','stavebniny','zahradnictví','chovatelské potřeby','trafika','second hand',
-        // řemesla a služby
         'instalatér','elektrikář','malíř','zámečník','truhlář','pokrývač','kominík','sklenář','stěhování','čistírna','prádelna','opravna','úklidové služby',
-        // profesní služby
         'účetní','právník','advokát','notář','realitní kancelář','pojišťovna','banka','finanční poradce','IT služby','reklamní agentura','tiskárna','fotograf',
-        // volný čas a ostatní
-        'školka','škola','sportovní hala','bazén','bowling','kino','muzeum','galerie','farma','vinařství','pivovar','zámečnictví','kovovýroba','zemědělské družstvo'
+        'školka','škola','sportovní hala','bazén','bowling','kino','muzeum','galerie','farma','vinařství','pivovar','kovovýroba','zemědělské družstvo'
     ];
 
     const state = {
         results: new Map(),      // placeId -> row
         geoCache: new Map(),
-        counters: { free: 0, sv: 0, addr: 0, geo: 0, ac: 0 },
-        busy: false
+        counters: { free: 0, sv: 0, geo: 0, ac: 0 },
+        busy: false,
+        cancel: false
     };
     document.getElementById('query-count').textContent = ALL_QUERIES.length;
 
@@ -272,46 +259,47 @@
         state.counters[key]++;
         document.getElementById('cnt-free').textContent = state.counters.free;
         document.getElementById('cnt-sv').textContent = state.counters.sv;
-        document.getElementById('cnt-addr').textContent = state.counters.addr;
         document.getElementById('cnt-geo').textContent = state.counters.geo;
         document.getElementById('cnt-ac').textContent = state.counters.ac;
     }
+    const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+    function fmtKm(m) { return (m / 1000).toFixed(1).replace('.', ','); }
 
-    // ===================== GEOKÓDOVÁNÍ OBCE (přes Maps JS API – funguje s klíčem omezeným na doménu) =====================
-    function geocodePlace(query) {
-        const key = query.toLowerCase();
-        if (state.geoCache.has(key)) return Promise.resolve(state.geoCache.get(key));
-        return mapsReady.then(() => new Promise((resolve, reject) => {
-            new google.maps.Geocoder().geocode({ address: query, region: 'cz' }, (results, status) => {
-                bumpCounter('geo');
-                if (status === 'REQUEST_DENIED') { reject(new Error('Geokódování odmítnuto – zkontrolujte, že je v Cloud Console povolené Geocoding API pro tento projekt.')); return; }
-                if (status !== 'OK' || !results || !results.length) { reject(new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres, např. „Jestřabí Lhota, okres Kolín".')); return; }
-                const res = results[0];
-                const loc = { lat: res.geometry.location.lat(), lng: res.geometry.location.lng() };
-                let radius = 2500, bounds = null;
-                const b = res.geometry.bounds || res.geometry.viewport;
-                if (b) {
-                    const ne = b.getNorthEast(), sw = b.getSouthWest();
-                    bounds = { low: { latitude: sw.lat(), longitude: sw.lng() }, high: { latitude: ne.lat(), longitude: ne.lng() } };
-                    const dLat = Math.abs(ne.lat() - sw.lat()) * 111320 / 2;
-                    const dLng = Math.abs(ne.lng() - sw.lng()) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
-                    radius = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
-                }
-                const locComp = (res.address_components || []).find(c => c.types.includes('locality') || c.types.includes('sublocality') || c.types.includes('administrative_area_level_3'));
-                const out = { lat: loc.lat, lng: loc.lng, radius, bounds, label: res.formatted_address, locality: locComp ? locComp.long_name : query };
-                state.geoCache.set(key, out);
-                resolve(out);
-            });
-        }));
+    // ===================== GEOMETRIE =====================
+    function distMeters(aLat, aLng, bLat, bLng) {
+        const R = 6371000, toR = Math.PI / 180;
+        const dLat = (bLat - aLat) * toR, dLng = (bLng - aLng) * toR;
+        const s = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * toR) * Math.cos(bLat * toR) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(s));
+    }
+    function rectCenter(r) { return { lat: (r.low.latitude + r.high.latitude) / 2, lng: (r.low.longitude + r.high.longitude) / 2 }; }
+    function rectHalfDiagM(r) {
+        const c = rectCenter(r);
+        return distMeters(c.lat, c.lng, r.high.latitude, r.high.longitude);
+    }
+    function splitRect(r) {
+        const mLat = (r.low.latitude + r.high.latitude) / 2;
+        const mLng = (r.low.longitude + r.high.longitude) / 2;
+        return [
+            { low: { latitude: r.low.latitude, longitude: r.low.longitude }, high: { latitude: mLat, longitude: mLng } },
+            { low: { latitude: r.low.latitude, longitude: mLng }, high: { latitude: mLat, longitude: r.high.longitude } },
+            { low: { latitude: mLat, longitude: r.low.longitude }, high: { latitude: r.high.latitude, longitude: mLng } },
+            { low: { latitude: mLat, longitude: mLng }, high: { latitude: r.high.latitude, longitude: r.high.longitude } }
+        ];
+    }
+    function rectFromRadius(lat, lng, radius) {
+        const dLat = radius / 111320;
+        const dLng = radius / (111320 * Math.cos(lat * Math.PI / 180));
+        return { low: { latitude: lat - dLat, longitude: lng - dLng }, high: { latitude: lat + dLat, longitude: lng + dLng } };
     }
 
-    // ===================== NAŠEPTÁVAČ OBCÍ (Autocomplete – zdarma do 10 000/měs.) =====================
+    // ===================== NAŠEPTÁVAČ OBCÍ (zdarma do 10 000/měs.) =====================
     let sugTimer = null, sugItems = [], sugActive = -1, sugSeq = 0;
     function onPlaceInput() {
         clearTimeout(sugTimer);
         const q = document.getElementById('inp-place').value.trim();
-        if (q.length < 2) { hideSuggest(); return; }
-        sugTimer = setTimeout(() => fetchSuggestions(q), 300);
+        if (q.length < 3) { hideSuggest(); return; }
+        sugTimer = setTimeout(() => fetchSuggestions(q), 400);
     }
     async function fetchSuggestions(q) {
         const seq = ++sugSeq;
@@ -319,12 +307,7 @@
             const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY },
-                body: JSON.stringify({
-                    input: q,
-                    languageCode: 'cs',
-                    includedRegionCodes: ['cz', 'sk'],
-                    includedPrimaryTypes: ['(regions)']
-                })
+                body: JSON.stringify({ input: q, languageCode: 'cs', includedRegionCodes: ['cz', 'sk'], includedPrimaryTypes: ['(regions)'] })
             });
             bumpCounter('ac');
             if (!r.ok) {
@@ -336,7 +319,7 @@
                 hideSuggest(); return;
             }
             const j = await r.json();
-            if (seq !== sugSeq) return; // mezitím přišel novější dotaz
+            if (seq !== sugSeq) return;
             const preds = (j.suggestions || []).map(s => s.placePrediction).filter(Boolean);
             if (!preds.length) { hideSuggest(); return; }
             sugItems = preds.slice(0, 6).map(p => ({
@@ -346,9 +329,7 @@
             }));
             sugActive = -1;
             renderSuggest();
-        } catch (e) {
-            hideSuggest();
-        }
+        } catch (e) { hideSuggest(); }
     }
     function renderSuggest() {
         const box = document.getElementById('place-suggest');
@@ -373,43 +354,70 @@
         else if (e.key === 'Escape') hideSuggest();
     }
 
-    // ===================== HLEDÁNÍ (Places API New – Text Search, ID-only = zdarma bez limitu) =====================
-    const SEARCH_FIELDS_FREE = 'places.id,nextPageToken';
-
-    async function textSearch(query, rect, pageToken) {
-        // locationRestriction = tvrdé ohraničení oblasti; v režimu Auto se použijí přesné hranice obce z geokódování
-        const body = {
-            textQuery: query,
-            pageSize: 20,
-            languageCode: 'cs',
-            locationRestriction: { rectangle: rect }
-        };
-        if (pageToken) body.pageToken = pageToken;
-        const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': EFFECTIVE_API_KEY,
-                'X-Goog-FieldMask': SEARCH_FIELDS_FREE
-            },
-            body: JSON.stringify(body)
-        });
-        bumpCounter('free');
-        if (!r.ok) {
-            const err = await r.json().catch(() => ({}));
-            const msg = (err.error && err.error.message) || ('HTTP ' + r.status);
-            if (/API key|referer|referrer|PERMISSION/i.test(msg)) showApiError('Places API (New) odmítlo požadavek: ' + msg + ' – zkontrolujte, že je v Cloud Console povolené „Places API (New)" a doména je v povolených refererech, nebo vložte jiný klíč níže.');
-            throw new Error(msg);
-        }
-        return r.json();
+    // ===================== GEOKÓDOVÁNÍ OBCE (1 požadavek na hledání) =====================
+    function geocodePlace(query) {
+        const key = query.toLowerCase();
+        if (state.geoCache.has(key)) return Promise.resolve(state.geoCache.get(key));
+        return mapsReady.then(() => new Promise((resolve, reject) => {
+            new google.maps.Geocoder().geocode({ address: query, region: 'cz' }, (results, status) => {
+                bumpCounter('geo');
+                if (status === 'REQUEST_DENIED') { reject(new Error('Geokódování odmítnuto – zkontrolujte povolení Geocoding API v Cloud Console.')); return; }
+                if (status !== 'OK' || !results || !results.length) { reject(new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres.')); return; }
+                const res = results[0];
+                const loc = { lat: res.geometry.location.lat(), lng: res.geometry.location.lng() };
+                let bounds = null, rIn = 900, rOut = 2500;
+                const b = res.geometry.bounds || res.geometry.viewport;
+                if (b) {
+                    const ne = b.getNorthEast(), sw = b.getSouthWest();
+                    bounds = { low: { latitude: sw.lat(), longitude: sw.lng() }, high: { latitude: ne.lat(), longitude: ne.lng() } };
+                    const dLat = Math.abs(ne.lat() - sw.lat()) * 111320 / 2;
+                    const dLng = Math.abs(ne.lng() - sw.lng()) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
+                    rIn = Math.max(500, Math.round(Math.min(dLat, dLng)));      // vepsaný okruh – pro filtr "jen zadaná obec"
+                    rOut = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
+                }
+                const out = { lat: loc.lat, lng: loc.lng, bounds, rIn, rOut, label: res.formatted_address };
+                state.geoCache.set(key, out);
+                resolve(out);
+            });
+        }));
     }
+
+    // ===================== ID-ONLY HLEDÁNÍ (zdarma bez limitu) =====================
+    async function searchIds(query, rect, maxPages) {
+        const ids = [];
+        let token = null, page = 0;
+        do {
+            page++;
+            const body = { textQuery: query, pageSize: 20, languageCode: 'cs', locationRestriction: { rectangle: rect } };
+            if (token) body.pageToken = token;
+            const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY, 'X-Goog-FieldMask': 'places.id,nextPageToken' },
+                body: JSON.stringify(body)
+            });
+            bumpCounter('free');
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                const msg = (err.error && err.error.message) || ('HTTP ' + r.status);
+                if (/API key|referer|referrer|PERMISSION/i.test(msg)) showApiError('Places API (New) odmítlo požadavek: ' + msg);
+                throw new Error(msg);
+            }
+            const j = await r.json();
+            (j.places || []).forEach(p => { if (p.id) ids.push(p.id); });
+            token = j.nextPageToken || null;
+        } while (token && page < maxPages);
+        return ids;
+    }
+
+    // ===================== HLAVNÍ SKEN =====================
+    function cancelSearch() { state.cancel = true; showToast('Zastavuji po dokončení aktuálního dotazu…'); }
 
     async function runSearch() {
         if (state.busy) return;
         const place = document.getElementById('inp-place').value.trim();
         if (!place) { showToast('Zadejte obec nebo město.'); return; }
         const maxPages = parseInt(document.getElementById('inp-pages').value, 10);
-        state.busy = true;
+        state.busy = true; state.cancel = false;
         setSearchBusy(true);
         const prog = document.getElementById('search-progress'), progText = document.getElementById('search-progress-text');
         prog.classList.remove('hidden');
@@ -417,123 +425,140 @@
             progText.textContent = 'Hledám obec „' + place + '"…';
             const geo = await geocodePlace(place);
             const radiusSel = document.getElementById('inp-radius').value;
-            let rect;
-            if (radiusSel === 'auto' && geo.bounds) {
-                rect = geo.bounds; // přesné hranice obce
-            } else {
-                const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
-                const dLat = radius / 111320;
-                const dLng = radius / (111320 * Math.cos(geo.lat * Math.PI / 180));
-                rect = {
-                    low:  { latitude: geo.lat - dLat, longitude: geo.lng - dLng },
-                    high: { latitude: geo.lat + dLat, longitude: geo.lng + dLng }
-                };
+            let rect0, townR;
+            if (radiusSel === 'auto' && geo.bounds) { rect0 = geo.bounds; townR = geo.rIn; }
+            else {
+                const radius = radiusSel === 'auto' ? geo.rOut : parseInt(radiusSel, 10);
+                rect0 = rectFromRadius(geo.lat, geo.lng, radius);
+                townR = radius;
             }
-            let added = 0, i = 0, okCount = 0, failCount = 0, lastErr = null;
-            for (const cat of ALL_QUERIES) {
-                i++;
-                progText.textContent = `${Math.round(i / ALL_QUERIES.length * 100)} % · „${cat}" – ${geo.label} · zatím ${state.results.size} zápisů`;
-                let token = null, page = 0;
-                do {
-                    page++;
-                    let data;
-                    try { data = await textSearch(cat, rect, token); okCount++; }
-                    catch (e) {
-                        console.warn('Search failed for', cat, e);
-                        failCount++; lastErr = e;
-                        // pokud selhávají hned první dotazy, nemá smysl projíždět celou sadu
-                        if (okCount === 0 && failCount >= 3) throw new Error('Hledání selhává – Places API vrací chybu: ' + (e.message || 'neznámá chyba'));
-                        break;
-                    }
-                    (data.places || []).forEach(p => {
-                        if (!p.id) return;
-                        if (state.results.has(p.id)) {
-                            const row = state.results.get(p.id);
-                            if (!row.cats.includes(cat)) row.cats.push(cat);
-                            return;
-                        }
-                        state.results.set(p.id, {
-                            id: p.id,
-                            address: '', lat: null, lng: null,
-                            cats: [cat],
-                            tour: null, tourAuthor: null,
-                            selected: false, addrLoading: false,
-                            area: geo.label, homeTown: geo.locality || '', inTown: null
+
+            // ---- FÁZE 1: nalezení všech zápisů v oblasti ----
+            const queryHits = new Map(); // query -> Set(id) nově nalezených touto relací
+            let added = 0, okCount = 0, failCount = 0, lastErr = null, qi = 0;
+            for (const q of ALL_QUERIES) {
+                if (state.cancel) break;
+                qi++;
+                progText.textContent = `Fáze 1/3 · hledání ${Math.round(qi / ALL_QUERIES.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
+                let ids = [];
+                try { ids = await searchIds(q, rect0, maxPages); okCount++; }
+                catch (e) {
+                    failCount++; lastErr = e;
+                    if (okCount === 0 && failCount >= 3) throw new Error('Hledání selhává – Places API vrací chybu: ' + (e.message || ''));
+                    continue;
+                }
+                ids.forEach(id => {
+                    if (state.results.has(id)) {
+                        const row = state.results.get(id);
+                        if (!row.cats.includes(q)) row.cats.push(q);
+                    } else {
+                        state.results.set(id, {
+                            id, cats: [q], loc: null, accM: null, distM: null, inTown: null,
+                            tour: null, tourAuthor: null, selected: false,
+                            area: geo.label, center: { lat: geo.lat, lng: geo.lng }, townR
                         });
                         added++;
+                    }
+                    if (!queryHits.has(q)) queryHits.set(q, new Set());
+                    queryHits.get(q).add(id);
+                });
+                if (qi % 10 === 0) renderTable();
+                await sleep(40);
+            }
+            renderTable();
+
+            // ---- FÁZE 2: mřížkové určení polohy (zdarma) ----
+            if (!state.cancel) {
+                const toLocate = new Set([...state.results.values()].filter(r => !r.loc).map(r => r.id));
+                let located = 0;
+                const totalToLocate = toLocate.size;
+                const updateP2 = () => { progText.textContent = `Fáze 2/3 · určuji polohu ${located}/${totalToLocate} firem…`; };
+                updateP2();
+                for (const [q, idSet] of queryHits) {
+                    if (state.cancel) break;
+                    const targets = [...idSet].filter(id => toLocate.has(id));
+                    if (!targets.length) continue;
+                    await localizeQuery(q, rect0, new Set(targets), 0, (id) => {
+                        if (toLocate.delete(id)) { located++; updateP2(); }
                     });
-                    token = data.nextPageToken || null;
-                } while (token && page < maxPages);
-                if (i % 10 === 0) renderTable();
+                }
+                // dopočítat vzdálenosti a příslušnost k obci
+                state.results.forEach(r => {
+                    if (r.loc) {
+                        r.distM = Math.round(distMeters(r.center.lat, r.center.lng, r.loc.lat, r.loc.lng));
+                        r.inTown = r.distM <= (r.townR + (r.accM || 0));
+                    }
+                });
+                renderTable();
             }
-            // Automaticky doplnit adresy nových zápisů (zdarma v limitu) – bez nich nejde poznat, které firmy jsou opravdu v zadané obci
-            const noAddr = [...state.results.values()].filter(r => !r.address && !r.addrLoading);
-            if (noAddr.length && noAddr.length <= 400) {
-                progText.textContent = 'Doplňuji adresy 0/' + noAddr.length + '…';
-                await loadAddressesCore(noAddr, (done, total) => { progText.textContent = 'Doplňuji adresy ' + done + '/' + total + '…'; });
-            } else if (noAddr.length > 400) {
-                showToast('Zápisů je hodně (' + noAddr.length + ') – adresy doplňte ručně tlačítkem, ať se nečerpá limit zbytečně.');
+
+            // ---- FÁZE 3: virtuálky (zdarma) ----
+            if (!state.cancel) {
+                await checkToursCore([...state.results.values()].filter(r => r.tour === null && r.loc), (d, t) => {
+                    progText.textContent = `Fáze 3/3 · ověřuji virtuálky ${d}/${t}…`;
+                });
+                renderTable();
             }
-            renderTable();
+
             const outOfTown = [...state.results.values()].filter(r => r.inTown === false).length;
-            if (failCount > 0 && lastErr) showApiError('Část dotazů selhala (' + failCount + '). Poslední chyba: ' + (lastErr.message || 'neznámá'));
-            showToast(added
-                ? `Přidáno ${added} nových zápisů` + (outOfTown ? `, z toho ${outOfTown} mimo obec (skryto filtrem)` : '') + `.`
-                : (failCount ? 'Hledání selhalo – viz chyba nahoře.' : 'Nenašly se žádné nové zápisy.'));
-            renderTable();
+            if (failCount > 0 && lastErr) showApiError('Část dotazů selhala (' + failCount + '). Poslední chyba: ' + (lastErr.message || ''));
+            showToast(state.cancel
+                ? 'Sken zastaven – zobrazeny dosavadní výsledky.'
+                : (added ? `Přidáno ${added} nových zápisů` + (outOfTown ? `, z toho ${outOfTown} mimo obec (skryto filtrem)` : '') + '.' : 'Nenašly se žádné nové zápisy.'));
         } catch (e) {
             showToast(e.message || 'Hledání selhalo.');
         } finally {
-            state.busy = false;
+            state.busy = false; state.cancel = false;
             setSearchBusy(false);
             prog.classList.add('hidden');
+            renderTable();
         }
+    }
+
+    // Rekurzivní zpřesnění polohy: dotaz q se pouští v podčtvercích; tvrdé ohraničení zaručí,
+    // že se zápis objeví jen ve čtverci, kde firma skutečně je.
+    const LOCATE_TARGET_M = 90;   // cílová přesnost (poloviční úhlopříčka čtverce)
+    const LOCATE_MAX_DEPTH = 5;
+    async function localizeQuery(q, rect, targetIds, depth, onLocated) {
+        if (!targetIds.size || state.cancel) return;
+        const half = rectHalfDiagM(rect);
+        if (half <= LOCATE_TARGET_M || depth >= LOCATE_MAX_DEPTH) {
+            const c = rectCenter(rect);
+            targetIds.forEach(id => setLoc(id, c, Math.round(half), onLocated));
+            return;
+        }
+        const remaining = new Set(targetIds);
+        for (const quad of splitRect(rect)) {
+            if (!remaining.size || state.cancel) break;
+            let ids = [];
+            try { ids = await searchIds(q, quad, 2); } catch (e) { continue; }
+            const found = ids.filter(id => remaining.has(id));
+            if (!found.length) continue;
+            found.forEach(id => remaining.delete(id));
+            const c = rectCenter(quad), h = Math.round(rectHalfDiagM(quad));
+            if (h <= LOCATE_TARGET_M || depth + 1 >= LOCATE_MAX_DEPTH) {
+                found.forEach(id => setLoc(id, c, h, onLocated));
+            } else {
+                await localizeQuery(q, quad, new Set(found), depth + 1, onLocated);
+            }
+            await sleep(30);
+        }
+        // nedohledané (např. přetečení stránkování) – přiřadit střed aktuálního čtverce jako hrubou polohu
+        const c0 = rectCenter(rect);
+        remaining.forEach(id => setLoc(id, c0, Math.round(half), onLocated));
+    }
+    function setLoc(id, center, accM, onLocated) {
+        const row = state.results.get(id);
+        if (!row || row.loc) return;
+        row.loc = { lat: center.lat, lng: center.lng };
+        row.accM = accM;
+        if (onLocated) onLocated(id);
     }
 
     function setSearchBusy(b) {
         document.getElementById('btn-search').disabled = b;
         document.getElementById('btn-search-icon').className = b ? 'fa-solid fa-circle-notch spin' : 'fa-solid fa-magnifying-glass';
         document.getElementById('btn-search-label').textContent = b ? 'Hledám…' : 'Vyhledat';
-    }
-
-    // ===================== ADRESY (Place Details Essentials – zdarma do 10 000/měs.) =====================
-    async function loadAddress(id) {
-        const row = state.results.get(id);
-        if (!row || row.address || row.addrLoading) return;
-        row.addrLoading = true;
-        try {
-            const r = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(id)
-                + '?fields=formattedAddress,location&languageCode=cs&key=' + EFFECTIVE_API_KEY);
-            bumpCounter('addr');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            row.address = d.formattedAddress || '–';
-            if (d.location) { row.lat = d.location.latitude; row.lng = d.location.longitude; }
-            row.inTown = townMatch(row.address, row.homeTown);
-        } catch (e) {
-            console.warn('Address load failed', e);
-        } finally {
-            row.addrLoading = false;
-        }
-    }
-    async function loadAddressesCore(pending, progressCb) {
-        for (let i = 0; i < pending.length; i++) {
-            await loadAddress(pending[i].id);
-            if ((i + 1) % 10 === 0) { renderTable(); if (progressCb) progressCb(i + 1, pending.length); }
-            await new Promise(res => setTimeout(res, 80));
-        }
-    }
-    async function loadAddressesForFiltered() {
-        if (state.busy) return;
-        const pending = filteredRows().filter(r => !r.address && !r.addrLoading);
-        if (!pending.length) { showToast('Adresy všech zobrazených zápisů už jsou doplněné.'); return; }
-        if (pending.length > 500 && !confirm('Doplnit adresy pro ' + pending.length + ' zápisů? Limit zdarma je 10 000 měsíčně.')) return;
-        state.busy = true;
-        showToast('Doplňuji adresy u ' + pending.length + ' zápisů…');
-        await loadAddressesCore(pending);
-        state.busy = false;
-        renderTable();
-        showToast('Hotovo – adresy doplněny.');
     }
 
     // ===================== VIRTUÁLKY (Street View metadata – zdarma bez limitu) =====================
@@ -545,8 +570,9 @@
     function checkTour(row) {
         return new Promise(resolve => {
             const sv = getSv();
-            if (!sv || row.lat == null) { row.tour = 'unknown'; resolve(); return; }
-            sv.getPanorama({ location: { lat: row.lat, lng: row.lng }, radius: 25, preference: 'nearest', sources: ['default'] }, (data, status) => {
+            if (!sv || !row.loc) { row.tour = 'unknown'; resolve(); return; }
+            const radius = Math.min(120, Math.max(35, row.accM || 60));
+            sv.getPanorama({ location: { lat: row.loc.lat, lng: row.loc.lng }, radius, preference: 'nearest', sources: ['default'] }, (data, status) => {
                 bumpCounter('sv');
                 if (status === 'OK' && data && data.copyright) {
                     row.tour = /google/i.test(data.copyright) ? 'no' : 'yes';
@@ -558,22 +584,22 @@
             });
         });
     }
+    async function checkToursCore(pending, progressCb) {
+        for (let i = 0; i < pending.length; i++) {
+            if (state.cancel) break;
+            await checkTour(pending[i]);
+            if ((i + 1) % 10 === 0) { renderTable(); if (progressCb) progressCb(i + 1, pending.length); }
+            await sleep(70);
+        }
+    }
     async function checkAllTours() {
         if (state.busy) return;
         const visible = filteredRows();
-        const noCoords = visible.filter(r => r.tour === null && r.lat == null).length;
-        const pending = visible.filter(r => r.tour === null && r.lat != null);
-        if (!pending.length) {
-            showToast(noCoords ? 'Nejdřív doplňte adresy – bez souřadnic nejde virtuálky ověřit.' : 'Virtuálky u zobrazených zápisů už jsou ověřené.');
-            return;
-        }
+        const pending = visible.filter(r => r.tour === null && r.loc);
+        if (!pending.length) { showToast('Virtuálky u zobrazených zápisů už jsou ověřené.'); return; }
         state.busy = true;
         showToast('Ověřuji virtuálky u ' + pending.length + ' zápisů…');
-        for (let i = 0; i < pending.length; i++) {
-            await checkTour(pending[i]);
-            if ((i + 1) % 10 === 0) renderTable();
-            await new Promise(res => setTimeout(res, 90));
-        }
+        await checkToursCore(pending);
         state.busy = false;
         renderTable();
         const withTour = pending.filter(r => r.tour === 'yes').length;
@@ -581,25 +607,19 @@
     }
 
     // ===================== TABULKA =====================
-    function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-    function townMatch(addr, town) {
-        if (!addr || !town) return null;
-        return norm(addr).includes(norm(town));
-    }
     function filteredRows() {
         const q = document.getElementById('flt-text').value.trim().toLowerCase();
         const noTour = document.getElementById('flt-notour').checked;
         const onlyTown = document.getElementById('flt-town').checked;
         let rows = [...state.results.values()];
-        if (q) rows = rows.filter(r => (r.address + ' ' + (r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
+        if (q) rows = rows.filter(r => ((r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
         if (noTour) rows = rows.filter(r => r.tour === 'no');
-        if (onlyTown) rows = rows.filter(r => r.inTown !== false); // firmy s adresou mimo obec skryjeme, nedoplněné necháme
-        rows.sort((a, b) => (a.cats[0] + a.address).localeCompare(b.cats[0] + b.address, 'cs'));
+        if (onlyTown) rows = rows.filter(r => r.inTown !== false);
+        rows.sort((a, b) => ((a.distM == null ? 1e9 : a.distM) - (b.distM == null ? 1e9 : b.distM)) || a.cats[0].localeCompare(b.cats[0], 'cs'));
         return rows;
     }
     function toggleAll(on) { filteredRows().forEach(r => r.selected = on); renderTable(); }
     function toggleRow(id, on) { const r = state.results.get(id); if (r) r.selected = on; }
-
     function clearResults() {
         if (!state.results.size) return;
         if (!confirm('Vymazat všech ' + state.results.size + ' výsledků?')) return;
@@ -607,7 +627,6 @@
         renderTable();
         showToast('Seznam vymazán.');
     }
-
     function mapsLink(id) { return 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(id); }
 
     function renderTable() {
@@ -618,7 +637,6 @@
         hc.classList.toggle('hidden', state.results.size === 0);
         hc.classList.toggle('flex', state.results.size > 0);
         document.getElementById('header-count-value').textContent = rows.length === state.results.size ? state.results.size : rows.length + ' / ' + state.results.size;
-        document.getElementById('addr-pending-count').textContent = rows.filter(r => !r.address).length;
         const hiddenTown = document.getElementById('flt-town').checked ? [...state.results.values()].filter(r => r.inTown === false).length : 0;
         document.getElementById('flt-town-note').textContent = hiddenTown ? '(' + hiddenTown + ' skryto)' : '';
         document.getElementById('results-empty').classList.toggle('hidden', rows.length > 0 || state.results.size === 0);
@@ -630,12 +648,16 @@
             else if (r.tour === 'unknown') tour = '<span class="badge b-amber">nelze ověřit</span>';
             else tour = '<span class="text-gray-300 text-xs">neověřeno</span>';
 
+            let locTxt;
+            if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu obce <span class="text-gray-300">· přesnost ±${r.accM} m</span>` + (r.inTown === false ? ' <span class="badge b-amber">mimo obec</span>' : '');
+            else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
+
             return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
                 <td class="px-2 py-3">
-                    <p class="text-sm ${r.address ? 'text-gray-900 font-medium' : 'text-gray-400 italic'} leading-tight">${r.addrLoading ? '<i class="fa-solid fa-circle-notch spin text-gray-300"></i>' : (r.address ? esc(r.address) : 'adresa nedoplněna – detaily na odkazu')}${r.inTown === false ? ' <span class="badge b-amber">mimo obec</span>' : ''}</p>
-                    <p class="text-[11px] text-gray-400 mt-0.5">${esc(r.area || '')}</p>
+                    <p class="text-sm text-gray-900 font-medium leading-tight">Firemní zápis <span class="text-gray-400 font-normal">· název a adresa na odkazu</span></p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">${locTxt}</p>
                 </td>
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
                 <td class="px-2 py-3">${tour}</td>
@@ -652,9 +674,12 @@
         const sel = all.filter(r => r.selected);
         const rows = sel.length ? sel : all;
         if (!rows.length) { showToast('Není co exportovat.'); return; }
-        const head = ['Nalezeno přes', 'Adresa', 'Oblast', 'Virtuálka', 'Odkaz na zápis'];
+        const head = ['Nalezeno přes', 'Oblast', 'Vzdálenost od středu (km)', 'Souřadnice (přibližné)', 'Přesnost (m)', 'Virtuálka', 'Odkaz na zápis'];
         const line = r => [
-            r.cats.join(', '), r.address, r.area || '',
+            r.cats.join(', '), r.area || '',
+            r.distM != null ? fmtKm(r.distM) : '',
+            r.loc ? (r.loc.lat.toFixed(5) + ', ' + r.loc.lng.toFixed(5)) : '',
+            r.accM != null ? r.accM : '',
             r.tour === 'yes' ? 'má' : (r.tour === 'no' ? 'nemá' : 'neověřeno'),
             mapsLink(r.id)
         ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(';');
@@ -668,26 +693,13 @@
         showToast('Exportováno ' + rows.length + ' zápisů' + (sel.length ? ' (jen vybrané)' : '') + '.');
     }
 
-    // ===================== MAPS JS API (geokódování + Street View metadata) =====================
-    let mapsReadyResolve;
-    const mapsReady = new Promise(res => { mapsReadyResolve = res; });
-    window.initGoogleServices = function () { mapsReadyResolve(); };
-    (function loadGoogleMaps() {
-        const s = document.createElement('script');
-        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&libraries=places&language=cs&callback=initGoogleServices';
-        s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – zkontrolujte API klíč a povolené domény (při otevření souboru z disku přes file:// klíč omezený na doménu nefunguje – otestujte až na GitHub Pages).');
-        document.head.appendChild(s);
-    })();
-
     // ===================== DIAGNOSTIKA =====================
     async function runDiagnostics() {
         showToast('Testuji připojení k API…');
         const lines = ['DIAGNOSTIKA API (' + location.origin + ')'];
-        // 1) Maps JavaScript API
         lines.push(window.google && window.google.maps
             ? '✓ Maps JavaScript API: načteno'
             : '✗ Maps JavaScript API: nenačteno — klíč je neplatný, nebo doména ' + location.hostname + ' není v povolených refererech.');
-        // 2) Places API (New) – našeptávač
         try {
             const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
                 method: 'POST',
@@ -695,12 +707,8 @@
                 body: JSON.stringify({ input: 'Kolín', languageCode: 'cs', includedRegionCodes: ['cz'] })
             });
             if (r.ok) lines.push('✓ Places API (New) – našeptávač: OK');
-            else {
-                const e = await r.json().catch(() => ({}));
-                lines.push('✗ Places API (New) – našeptávač: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || 'neznámá chyba'));
-            }
+            else { const e = await r.json().catch(() => ({})); lines.push('✗ Places API (New) – našeptávač: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || '')); }
         } catch (e) { lines.push('✗ Places API (New) – našeptávač: ' + e.message); }
-        // 3) Places API (New) – hledání
         try {
             const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
                 method: 'POST',
@@ -708,26 +716,27 @@
                 body: JSON.stringify({ textQuery: 'restaurace Kolín', pageSize: 1, languageCode: 'cs' })
             });
             if (r.ok) lines.push('✓ Places API (New) – hledání zápisů: OK');
-            else {
-                const e = await r.json().catch(() => ({}));
-                lines.push('✗ Places API (New) – hledání zápisů: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || 'neznámá chyba'));
-            }
+            else { const e = await r.json().catch(() => ({})); lines.push('✗ Places API (New) – hledání zápisů: HTTP ' + r.status + ' — ' + ((e.error && e.error.message) || '')); }
         } catch (e) { lines.push('✗ Places API (New) – hledání zápisů: ' + e.message); }
 
         const txt = lines.join('\n');
         let hint = '';
-        if (/has not been used|is disabled|SERVICE_DISABLED/i.test(txt)) hint = '\n\nŘEŠENÍ: V Cloud Console povolte službu „Places API (New)" — je to jiná položka než staré „Places API". Otevřete console.cloud.google.com/apis/library/places.googleapis.com a klikněte Enable.';
-        else if (/referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)) hint = '\n\nŘEŠENÍ: Doména ' + location.hostname + ' není v povolených refererech klíče. V Cloud Console → Credentials → váš klíč → Website restrictions přidejte: https://' + location.hostname + '/* — pokud testujete soubor z disku (file://), nahrajte ho nejdřív na web.';
-        else if (/API key not valid/i.test(txt)) hint = '\n\nŘEŠENÍ: Klíč je neplatný — zkontrolujte, že je v souboru vložený celý a správně.';
-        if (lines.every(l => !l.startsWith('✗'))) {
-            showApiError(txt + '\n\nVšechny testy prošly — pokud našeptávač stále nic nenabízí, napište mi, co přesně zadáváte.');
-        } else {
-            showApiError(txt + hint);
-        }
+        if (/has not been used|is disabled|SERVICE_DISABLED/i.test(txt)) hint = '\n\nŘEŠENÍ: V Cloud Console povolte službu „Places API (New)" — console.cloud.google.com/apis/library/places.googleapis.com → Enable.';
+        else if (/referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)) hint = '\n\nŘEŠENÍ: Přidejte do Website restrictions klíče položku https://' + location.hostname + '/* (s hvězdičkou, bez cesty).';
+        else if (/API key not valid/i.test(txt)) hint = '\n\nŘEŠENÍ: Klíč je neplatný — zkontrolujte, že je vložený celý a správně.';
+        showApiError(lines.every(l => !l.startsWith('✗')) ? txt + '\n\nVšechny testy prošly.' : txt + hint);
     }
 
-    // ===================== INIT =====================
-    // init hotov
+    // ===================== MAPS JS API =====================
+    let mapsReadyResolve;
+    const mapsReady = new Promise(res => { mapsReadyResolve = res; });
+    window.initGoogleServices = function () { mapsReadyResolve(); };
+    (function loadGoogleMaps() {
+        const s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&language=cs&callback=initGoogleServices';
+        s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – zkontrolujte API klíč a povolené domény.');
+        document.head.appendChild(s);
+    })();
     </script>
 </body>
 </html>
