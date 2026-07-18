@@ -899,6 +899,7 @@
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                     <button onclick="openProfile('${esc(r.id)}')" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-600 transition"><i class="fa-regular fa-eye"></i> zobrazit profil</button>
+                    <button onclick="quickExclude('${esc(r.id)}')" title="${saved && saved.excluded ? 'Vrátit mezi aktivní' : 'Vyřadit – při příštím skenu oblasti hned uvidíte, že tenhle zápis už nechcete'}" class="inline-flex items-center gap-1.5 border ${saved && saved.excluded ? 'border-brand-500 text-brand-600 hover:bg-brand-50' : 'border-gray-200 text-gray-500 hover:text-amber-600 hover:border-amber-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${saved && saved.excluded ? 'fa-rotate-left' : 'fa-ban'}"></i> ${saved && saved.excluded ? 'obnovit' : 'vyřadit'}</button>
                     <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" title="Otevřít v Google Mapách" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-500 hover:text-brand-600 hover:border-brand-500 transition ml-1"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
                 </td>
             </tr>`;
@@ -991,6 +992,24 @@
                 <button onclick="deleteLead('${esc(l.id)}')" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-300 transition ml-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
             </td>
         </tr>`).join('');
+    }
+    function quickExclude(id) {
+        const lead = state.myLeads.get(id);
+        if (lead) {
+            lead.excluded = !lead.excluded;
+            showToast(lead.excluded ? 'Zápis označen jako vyřazený.' : 'Zápis vrácen mezi aktivní.');
+        } else {
+            const row = state.results.get(id);
+            state.myLeads.set(id, {
+                id, name: '', person: '', phone: '', phone2: '', web: '', email: '', note: '', stars: 0,
+                area: row ? row.area : '', distM: row ? row.distM : null, cats: row ? row.cats : [],
+                excluded: true, savedAt: Date.now()
+            });
+            showToast('Zápis vyřazen – při příštím skenu oblasti bude označený.');
+        }
+        persistLeads();
+        renderMyList();
+        renderTable();
     }
     function toggleExcluded(id) {
         const l = state.myLeads.get(id);
