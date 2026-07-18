@@ -1,297 +1,646 @@
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIEW - Statistiky Google Moje Firma</title>
-    
-    <!-- Scripts & Styles -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Prop-Types must be loaded before Recharts -->
-    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>View Lead Finder | Vyhledávání firemních zápisů</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/recharts@2.1.16/umd/Recharts.js"></script>
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;700&family=Roboto:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
+            colors: { brand: {50:'#f0fdf4',100:'#dcfce7',500:'#16a34a',600:'#15803d',700:'#166534'}, surface:'#fcfcfc', border:'#e5e7eb' }
+        }}};
+    </script>
     <style>
-        :root {
-            --google-font: 'Google Sans', 'Product Sans', 'Open Sans', 'Roboto', Arial, sans-serif;
-        }
-        * {
-            font-family: var(--google-font) !important;
-        }
-        body {
-            background-color: #F8F9FA;
-            color: #3C4043;
-        }
-        h1, h2, h3, h4, .font-bold {
-            letter-spacing: -0.01em;
-        }
-        /* Custom transitions for Recharts and Modals */
-        .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line {
-            stroke: #f1f3f4;
-        }
+        body { background-color: #f3f4f6; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        .card-minimal { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px 0 rgba(0,0,0,0.02); transition:border-color .2s, box-shadow .2s; }
+        .card-minimal:hover { border-color:#d1d5db; box-shadow:0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03); }
+        input[type="checkbox"] { accent-color:#16a34a; width:1.05rem; height:1.05rem; cursor:pointer; flex-shrink:0; }
+        .cat-chip { border:1px solid #e5e7eb; background:#fff; color:#374151; border-radius:99px; padding:5px 13px; font-size:12.5px; font-weight:600; cursor:pointer; transition:all .15s; user-select:none; }
+        .cat-chip:hover { border-color:#86efac; }
+        .cat-chip.on { background:#f0fdf4; border-color:#16a34a; color:#166534; }
+        .badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; border-radius:99px; padding:2px 8px; white-space:nowrap; }
+        .b-green { background:#f0fdf4; color:#15803d; border:1px solid #dcfce7; }
+        .b-gray { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
+        .b-amber { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+        .b-red { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+        th.sortable { cursor:pointer; user-select:none; }
+        th.sortable:hover { color:#111827; }
+        .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="font-sans text-gray-900 h-screen flex overflow-hidden antialiased">
 
-    <script type="text/babel">
-        const { 
-            AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-            BarChart, Bar
-        } = window.Recharts;
+    <div id="mobile-overlay" onclick="toggleMobileMenu()" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-30 hidden md:hidden transition-opacity opacity-0 duration-300"></div>
 
-        // --- MANUÁLNÍ IKONY (SVG) PRO MAXIMÁLNÍ KOMPATIBILITU ---
-        const Icon = ({ name, className = "w-5 h-5", strokeWidth = 2 }) => {
-            const icons = {
-                users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-                eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>,
-                star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
-                globe: <><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10z"/></>,
-                search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-                trendingUp: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
-                trendingDown: <><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></>,
-                barChart: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
-                alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
-                info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
-                check: <polyline points="20 6 9 17 4 12"/>,
-                x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
-                chevronRight: <polyline points="9 18 15 12 9 6"/>,
-                arrowRight: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>
-            };
-            return (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name]}
-                </svg>
-            );
-        };
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-64 bg-surface border-r border-border flex flex-col flex-shrink-0 z-40 fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300">
+        <div class="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
+            <img src="https://viewcz.com/images/svg/head-logo.svg" alt="View Logo" class="h-8 object-contain">
+            <button onclick="toggleMobileMenu()" class="md:hidden text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-1">
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nástroj</p>
+            <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left bg-brand-50 text-brand-700">
+                <i class="fa-solid fa-magnifying-glass-location w-5 text-center"></i> Vyhledávání leadů
+            </button>
 
-        // --- MOCK DATA ---
-        const generateData = () => {
-            const months = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čer', 'Čec', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'];
-            return months.map(m => ({
-                name: m,
-                interakce: Math.floor(Math.random() * 300) + 200,
-                prevInterakce: Math.floor(Math.random() * 250) + 150,
-                zobrazeni: Math.floor(Math.random() * 1000) + 800,
-                recenze: Math.floor(Math.random() * 10) + 2,
-                streetView: Math.floor(Math.random() * 2000) + 5000
-            }));
-        };
+            <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Spotřeba API (relace)</p>
+            <div class="mx-3 card-minimal !shadow-none p-3 text-xs text-gray-600 space-y-1.5">
+                <div class="flex justify-between"><span>Hledání (Text Search)</span><strong id="cnt-search" class="text-gray-900">0</strong></div>
+                <div class="flex justify-between"><span>Kontakty (Details)</span><strong id="cnt-detail" class="text-gray-900">0</strong></div>
+                <div class="flex justify-between"><span>Geokódování</span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
+                <div class="flex justify-between"><span>Virtuálky (zdarma)</span><strong id="cnt-sv" class="text-gray-900">0</strong></div>
+            </div>
+            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Kontakty se dotahují jen na vyžádání, aby hledání zůstalo co nejlevnější.</p>
+        </nav>
+        <div class="p-4 border-t border-border bg-gray-50">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
+            <p class="text-xs text-gray-500">Testovací verze · interní nástroj obchodního týmu</p>
+        </div>
+    </aside>
 
-        const welcomeStats = [
-            { id: 'interakce', title: 'Interakce celkem', total: 124580, periodValue: 3412, periodTrend: 12.5, icon: 'users', color: '#34A853', description: 'Hovory, navigace a prokliky na web.' },
-            { id: 'streetview', title: 'Zobrazení prohlídky', total: 842105, periodValue: 12840, periodTrend: -4.2, icon: 'globe', color: '#FBBC05', description: 'Zhlédnutí 360° prohlídek a fotek.' },
-            { id: 'zobrazeni', title: 'Zobrazení profilu', total: 2154300, periodValue: 84200, periodTrend: 5.2, icon: 'eye', color: '#4285F4', description: 'Lidé, kteří viděli váš profil na Googlu.' },
-            { id: 'vyhledavani', title: 'Nalezení vyhledáváním', total: 1542000, periodValue: 56120, periodTrend: 8.9, icon: 'search', color: '#EA4335', description: 'Dotazy vedoucí k vašemu profilu.' }
-        ];
+    <!-- MAIN -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+        <header class="h-16 bg-surface border-b border-border flex items-center justify-between px-4 sm:px-8 z-20 shrink-0 gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <button onclick="toggleMobileMenu()" class="md:hidden text-gray-500 hover:text-gray-700 transition"><i class="fa-solid fa-bars text-xl"></i></button>
+                <h1 class="text-lg sm:text-xl font-semibold text-gray-900 tracking-tight truncate">Vyhledávání firemních zápisů</h1>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <div id="header-count" class="hidden items-center gap-2 bg-white border border-gray-200 rounded-full px-3.5 py-1.5 shadow-sm">
+                    <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+                    <span class="text-xs text-gray-500 font-medium hidden sm:inline">Nalezeno</span>
+                    <span id="header-count-value" class="text-sm font-bold text-gray-900">0</span>
+                </div>
+            </div>
+        </header>
 
-        // --- MODAL ---
-        const RecommendationsModal = ({ isOpen, onClose }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm text-sm" onClick={onClose}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-[#DADCE0] overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="px-8 py-5 border-b border-[#DADCE0] flex justify-between items-center bg-[#F8F9FA]">
-                            <div className="flex items-center gap-3 text-[#EA4335]">
-                                <Icon name="alert" className="w-6 h-6" />
-                                <h2 className="font-bold text-gray-900 text-lg">Strategie pro obnovení růstu</h2>
-                            </div>
-                            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"><Icon name="x" className="w-5 h-5" /></button>
-                        </div>
-                        <div className="p-8 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="p-5 bg-white border border-[#DADCE0] rounded-xl shadow-sm">
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Analýza Sezónnosti</h3>
-                                    <p className="text-gray-600 leading-relaxed text-xs">Pokles může být přirozený. Prověřujeme historické trendy na trhu.</p>
-                                </div>
-                                <div className="p-5 bg-white border border-[#DADCE0] rounded-xl shadow-sm">
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Kvalita obsahu</h3>
-                                    <p className="text-gray-600 leading-relaxed text-xs">Google upřednostňuje profily s novými fotkami. Přidejte 3–5 snímků měsíčně.</p>
-                                </div>
-                            </div>
-                            <div className="p-5 bg-[#F8F9FA] rounded-xl border border-[#DADCE0]">
-                                <h4 className="text-[10px] font-bold uppercase text-gray-400 mb-4 tracking-widest">Rychlý kontrolní seznam</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
-                                    <div className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-[#34A853]" /> Aktualizovat otevírací dobu</div>
-                                    <div className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-[#34A853]" /> Nahrát 3 nové fotky</div>
-                                    <div className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-[#34A853]" /> Vytvořit příspěvek</div>
-                                    <div className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-[#34A853]" /> Odpovědět na recenze</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 border-t border-[#DADCE0] flex justify-center bg-[#F8F9FA]">
-                            <button onClick={onClose} className="bg-gray-900 text-white px-10 py-3 rounded-full text-sm font-bold hover:bg-black transition-all flex items-center gap-3 shadow-lg">
-                                Rozumím, zavřít <Icon name="arrowRight" className="w-4 h-4" />
-                            </button>
-                        </div>
+        <main id="main-scroll" class="flex-1 overflow-y-auto p-4 sm:p-8 relative bg-gray-100">
+            <div id="api-error-banner" class="hidden max-w-6xl mx-auto mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-start">
+                <div class="w-9 h-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="text-sm text-red-700 leading-relaxed flex-1 min-w-0">
+                    <span id="api-error-text"></span>
+                    <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                        <input id="api-key-input" type="text" placeholder="Vložit jiný API klíč (dočasně)" class="flex-1 p-2 border border-red-300 rounded-lg text-sm outline-none bg-white text-gray-800">
+                        <button onclick="applyApiKeyOverride()" class="bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-red-700 transition shadow-sm shrink-0">Použít</button>
                     </div>
                 </div>
-            );
-        };
+            </div>
 
-        // --- KPI CARD ---
-        const WelcomeKpiCard = ({ stat }) => {
-            const isNegative = stat.periodTrend < 0;
-            return (
-                <div className="bg-white border border-[#DADCE0] p-6 rounded-xl shadow-sm hover:shadow-md transition-all group">
-                    <div className="flex justify-between items-start mb-5">
-                        <div className="text-gray-300 group-hover:text-[#34A853] transition-colors">
-                            <Icon name={stat.icon} className="w-6 h-6" />
-                        </div>
-                        <div className="text-right">
-                            <div className={`flex items-center font-bold text-sm ${isNegative ? 'text-[#EA4335]' : 'text-[#34A853]'}`}>
-                                <Icon name={isNegative ? 'trendingDown' : 'trendingUp'} className="w-4 h-4 mr-1" />
-                                {Math.abs(stat.periodTrend)}%
-                            </div>
-                            <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">vs loni</div>
-                        </div>
-                    </div>
-                    <div className="mb-5">
-                        <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 leading-none">{stat.title}</h3>
-                        <div className="text-3xl font-black text-gray-900 tracking-tighter leading-none">{stat.periodValue.toLocaleString()}</div>
-                    </div>
-                    <div className="pt-5 border-t border-[#F1F3F4] flex justify-between items-center">
-                        <div className="leading-tight">
-                            <p className="text-[9px] text-gray-400 font-bold uppercase mb-0.5 tracking-tighter">Historický součet</p>
-                            <p className="text-base font-light text-gray-500 tracking-tight">{stat.total.toLocaleString()}</p>
-                        </div>
-                        <div className="group/info relative cursor-help">
-                            <Icon name="info" className="w-3.5 h-3.5 text-gray-200 hover:text-gray-400" />
-                            <div className="absolute bottom-full right-0 mb-3 w-48 p-3 bg-gray-900 text-white text-[10px] rounded-lg shadow-2xl opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all z-20 leading-relaxed">
-                                {stat.description}
+            <div class="max-w-6xl mx-auto space-y-6">
+
+                <!-- SEARCH CARD -->
+                <div class="card-minimal p-5 sm:p-6">
+                    <div class="flex flex-col lg:flex-row gap-4 lg:items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">Obec / město / vesnice</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-location-dot absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                                <input id="inp-place" type="text" placeholder="např. Kolín, Kutná Hora, Červené Pečky…" class="w-full pl-9 p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" onkeydown="if(event.key==='Enter')runSearch()">
                             </div>
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">Okruh</label>
+                            <select id="inp-radius" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
+                                <option value="auto" selected>Auto (dle obce)</option>
+                                <option value="1000">1 km</option>
+                                <option value="2000">2 km</option>
+                                <option value="5000">5 km</option>
+                                <option value="10000">10 km</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5" title="Každá stránka = 20 výsledků = 1 požadavek navíc na kategorii">Hloubka</label>
+                            <select id="inp-pages" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
+                                <option value="1" selected>do 20 firem / kat.</option>
+                                <option value="2">do 40 firem / kat.</option>
+                                <option value="3">do 60 firem / kat.</option>
+                            </select>
+                        </div>
+                        <button id="btn-search" onclick="runSearch()" class="bg-brand-500 text-white py-2.5 px-6 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center justify-center gap-2 shrink-0">
+                            <i id="btn-search-icon" class="fa-solid fa-magnifying-glass"></i> <span id="btn-search-label">Vyhledat</span>
+                        </button>
                     </div>
+
+                    <div class="mt-5 pt-4 border-t border-gray-100">
+                        <div class="flex items-center justify-between mb-2.5 flex-wrap gap-2">
+                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Kategorie (obory)</p>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span id="est-requests" class="text-gray-400"></span>
+                                <button onclick="setAllCats(true)" class="text-brand-600 font-semibold hover:underline">vše</button>
+                                <button onclick="setAllCats(false)" class="text-gray-500 font-semibold hover:underline">nic</button>
+                            </div>
+                        </div>
+                        <div id="cat-chips" class="flex flex-wrap gap-1.5"></div>
+                        <div class="mt-3 flex items-start gap-2">
+                            <input id="inp-custom-cat" type="text" placeholder="vlastní obor (např. solárium)…" class="p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-56" onkeydown="if(event.key==='Enter')addCustomCat()">
+                            <button onclick="addCustomCat()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Přidat</button>
+                        </div>
+                    </div>
+                    <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2"><i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span></div>
                 </div>
-            );
-        };
 
-        // --- APP ---
-        function App() {
-            const [isModalOpen, setModalOpen] = React.useState(false);
-            const [viewType, setViewType] = React.useState('měsíc');
-            const data = React.useMemo(() => generateData(), [viewType]);
-            const hasNegativeTrend = React.useMemo(() => welcomeStats.some(s => s.periodTrend < 0), []);
-
-            return (
-                <div className="min-h-screen pb-20">
-                    <RecommendationsModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} />
-
-                    {/* HEADER */}
-                    <header className="sticky top-0 z-50 bg-white border-b border-[#DADCE0] shadow-sm">
-                        {/* VIEW Logo - zmenšené */}
-                        <div className="py-3 px-4 md:px-10 border-b border-gray-100 flex items-center justify-start">
-                            <div className="h-7 md:h-8">
-                                <img src="https://viewcz.com/images/svg/head-logo.svg" alt="VIEW" className="h-full w-auto object-contain block opacity-90" />
-                            </div>
+                <!-- RESULTS -->
+                <div id="results-wrap" class="hidden card-minimal overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                        <div class="relative">
+                            <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                            <input id="flt-text" type="text" placeholder="filtrovat…" oninput="renderTable()" class="pl-8 p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-40">
                         </div>
-                        {/* Subheader - Statistiky + Google Moje Firma */}
-                        <div className="py-2.5 px-4 md:px-10 flex items-center justify-start bg-white/50">
-                            <div className="flex items-center gap-3">
-                                {/* Zviditelněná ikona statistik */}
-                                <div className="text-[#34A853]"><Icon name="barChart" className="w-5 h-5" strokeWidth={2.5} /></div>
-                                <div className="flex items-center gap-2 text-sm md:text-base font-normal text-gray-700">
-                                    <span className="font-medium text-gray-600">Statistiky</span>
-                                    <div className="flex items-center h-5 border-l border-gray-300 ml-1 pl-3">
-                                        {/* Větší Google logo + text */}
-                                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/3840px-Google_2015_logo.svg.png" alt="Google" className="h-4 md:h-5 w-auto block object-contain" />
-                                        <span className="font-light text-gray-500 ml-2 whitespace-nowrap">Moje Firma</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main className="max-w-7xl mx-auto px-4 md:px-10 pt-10">
-                        {/* WELCOME */}
-                        <div className="bg-white border border-[#DADCE0] p-8 md:p-12 rounded-2xl mb-12 shadow-sm">
-                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 mb-12">
-                                <div className="max-w-3xl text-gray-500 text-lg md:text-xl leading-relaxed font-light">
-                                    <div className="inline-flex items-center gap-2 bg-[#E6F4EA] text-[#34A853] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6">Souhrnný přehled firemní prezentace</div>
-                                    <p>Tento dashboard zobrazuje aktuální výsledky a efektivitu vaší prezentace na Googlu spravované v systému <strong className="text-gray-900 font-bold">VIEW</strong>. Data reprezentují souhrnnou aktivitu uživatelů napříč lokalitami.</p>
-                                    {hasNegativeTrend && (
-                                        <button onClick={() => setModalOpen(true)} className="flex items-center gap-3 bg-[#FCE8E6] hover:bg-[#FAD2CF] text-[#C5221F] px-6 py-3 rounded-xl text-sm font-bold mt-8 transition-all border border-[#FAD2CF] group shadow-sm">
-                                            <Icon name="alert" className="w-5 h-5 animate-pulse" /> Zobrazit doporučení pro růst <Icon name="chevronRight" className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="bg-[#F8F9FA] border border-[#DADCE0] p-6 rounded-xl text-center min-w-[240px]">
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Aktuálně zobrazeno</p>
-                                    <p className="text-xl font-black text-gray-800 tracking-tight">Posledních 30 dní</p>
-                                    <div className="my-4 h-[1px] bg-gray-200 w-full opacity-50"></div>
-                                    <p className="text-[10px] text-[#34A853] font-bold uppercase tracking-wider">Vs stejné období 2024</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                                {welcomeStats.map(stat => <WelcomeKpiCard key={stat.id} stat={stat} />)}
-                            </div>
-                        </div>
-
-                        {/* CHART SECTION */}
-                        <div className="mt-20">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-white border border-[#DADCE0] text-[#34A853] rounded-xl shadow-sm"><Icon name="users" className="w-6 h-6" /></div>
-                                    <h2 className="text-2xl font-black text-gray-800 tracking-tight italic uppercase">Detailní vývoj interakcí</h2>
-                                </div>
-                                <div className="flex gap-1 p-1 bg-white border border-[#DADCE0] rounded-full shadow-sm overflow-hidden">
-                                    {['týden', 'měsíc', 'rok'].map(type => (
-                                        <button key={type} onClick={() => setViewType(type)} className={`px-5 py-2 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${viewType === type ? 'bg-[#34A853] text-white' : 'text-gray-400 hover:text-gray-600'}`}>
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="bg-white p-10 md:p-14 border border-[#DADCE0] rounded-2xl shadow-sm">
-                                <div className="flex justify-between items-center mb-12 text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                    <p>Meziroční srovnání aktivity</p>
-                                    <div className="flex gap-6">
-                                        <span className="flex items-center gap-2.5 text-[#34A853]"><div className="w-3 h-3 rounded-full bg-[#34A853]" /> Aktuální</span>
-                                        <span className="flex items-center gap-2.5"><div className="w-3 h-0.5 bg-gray-300" /> Loni</span>
-                                    </div>
-                                </div>
-                                <div className="h-[420px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data}>
-                                            <defs>
-                                                <linearGradient id="colorInt" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#34A853" stopOpacity={0.1}/>
-                                                    <stop offset="95%" stopColor="#34A853" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#70757a', fontSize: 11, fontWeight: 900}} dy={15} />
-                                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#70757a', fontSize: 11, fontWeight: 900}} />
-                                            <Tooltip contentStyle={{borderRadius: '12px', border: '1px solid #DADCE0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                                            <Area type="monotone" dataKey="prevInterakce" stroke="#cbd5e1" fill="transparent" strokeDasharray="5 5" strokeWidth={2} />
-                                            <Area type="monotone" dataKey="interakce" stroke="#34A853" fill="url(#colorInt)" strokeWidth={4} />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-
-                        <footer className="mt-32 pt-12 border-t border-[#DADCE0] flex flex-col md:flex-row justify-between items-center text-gray-400 text-[10px] font-bold uppercase tracking-[0.3em] gap-8">
-                            <p>© 2024 VIEW - Autorizovaný partner Google</p>
-                            <div className="flex gap-8 items-center">
-                                <span>Google My Business API</span>
-                                <span className="text-gray-200">|</span>
-                                <span className="text-gray-800 font-bold">v2.9.0-GITHUB</span>
-                            </div>
-                        </footer>
-                    </main>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-notour" onchange="renderTable()"> bez virtuálky</label>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-noweb" onchange="renderTable()"> bez webu</label>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-weak" onchange="renderTable()"> nespravované</label>
+                        <span class="flex-1"></span>
+                        <button onclick="checkAllTours()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Zjistí přes Street View metadata (zdarma), zda je u firmy nahrané panorama / prohlídka.">
+                            <i class="fa-solid fa-street-view"></i> Ověřit virtuálky <span class="badge b-green">zdarma</span>
+                        </button>
+                        <button onclick="loadDetailsForFiltered()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Dotáhne telefon, web a hodnocení pro zobrazené firmy. 1 placený požadavek na firmu.">
+                            <i class="fa-solid fa-address-book"></i> Načíst kontakty <span id="detail-pending-count" class="badge b-gray">0</span>
+                        </button>
+                        <button onclick="exportCsv()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-csv"></i> Export CSV
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm min-w-[900px]">
+                            <thead>
+                                <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                    <th class="px-4 py-3 w-8"><input type="checkbox" id="chk-all" onchange="toggleAll(this.checked)"></th>
+                                    <th class="px-2 py-3 sortable" onclick="setSort('name')">Firma <i class="fa-solid fa-sort text-gray-300"></i></th>
+                                    <th class="px-2 py-3">Kategorie</th>
+                                    <th class="px-2 py-3 sortable" onclick="setSort('photos')">Fotky <i class="fa-solid fa-sort text-gray-300"></i></th>
+                                    <th class="px-2 py-3 sortable" onclick="setSort('rating')">Hodnocení <i class="fa-solid fa-sort text-gray-300"></i></th>
+                                    <th class="px-2 py-3">Kontakt</th>
+                                    <th class="px-2 py-3">Signály</th>
+                                    <th class="px-4 py-3 text-right">Odkazy</th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="results-empty" class="hidden px-5 py-10 text-center text-sm text-gray-400">Žádná firma neodpovídá filtrům.</div>
                 </div>
-            );
+
+                <!-- EMPTY STATE -->
+                <div id="empty-state" class="card-minimal p-10 text-center">
+                    <div class="w-14 h-14 mx-auto rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-map-location-dot"></i></div>
+                    <h2 class="font-bold text-gray-900 mb-1.5">Najděte firemní zápisy v oblasti</h2>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec, vyberte obory a získáte seznam firem s odkazy na jejich zápisy na Googlu. Kontakty a stav virtuální prohlídky si pak dotáhnete jedním klikem u firem, které vás zajímají.</p>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-lg shadow-xl opacity-0 pointer-events-none transition-all duration-300 z-[80] flex items-center gap-3">
+        <i class="fa-solid fa-circle-check text-brand-500"></i>
+        <span id="toast-message" class="text-sm font-medium"></span>
+    </div>
+
+    <!-- POZOR: API klíč omezte v Google Cloud Console na vaši doménu (HTTP referrer) + Maps JavaScript API, Places API (New) a Geocoding API -->
+    <script> const API_KEY = "AIzaSyAnwJg7hLl05s-usDuSvrcM3nnu90dRczI"; </script>
+    <script>
+    // ===================== API KEY (stejný mechanismus jako Sales Suite: #apikey=... v URL) =====================
+    const API_KEY_OVERRIDE = (() => { try { return new URLSearchParams(location.hash.replace(/^#/, '')).get('apikey'); } catch (e) { return null; } })();
+    const EFFECTIVE_API_KEY = (API_KEY_OVERRIDE && API_KEY_OVERRIDE.trim()) || API_KEY;
+
+    function applyApiKeyOverride() {
+        const v = document.getElementById('api-key-input').value.trim();
+        if (!v) return;
+        location.hash = 'apikey=' + encodeURIComponent(v);
+        location.reload();
+    }
+
+    // ===================== STAV =====================
+    const CATEGORIES = [
+        'restaurace','hospoda','kavárna','cukrárna','pekárna','hotel','penzion','ubytování',
+        'autoservis','pneuservis','autobazar','kadeřnictví','kosmetika','masáže','fitness','wellness',
+        'zubař','lékař','veterinář','lékárna','optika','květinářství','řeznictví','potraviny',
+        'stavebniny','instalatér','elektro','autoškola','realitní kancelář','účetní'
+    ];
+    const DEFAULT_ON = new Set(['restaurace','hospoda','kavárna','hotel','penzion','autoservis','kadeřnictví','fitness']);
+
+    const state = {
+        cats: new Set(DEFAULT_ON),
+        results: new Map(),      // placeId -> row
+        geoCache: new Map(),     // "obec" -> {lat,lng,radius,label}
+        sort: { key: 'name', dir: 1 },
+        counters: { search: 0, detail: 0, geo: 0, sv: 0 },
+        busy: false
+    };
+
+    // ===================== UI HELPERS =====================
+    let toastTimer = null;
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        document.getElementById('toast-message').textContent = msg;
+        t.style.opacity = '1'; t.style.pointerEvents = 'auto';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.style.opacity = '0'; t.style.pointerEvents = 'none'; }, 3200);
+    }
+    function toggleMobileMenu() {
+        const sb = document.getElementById('sidebar'), ov = document.getElementById('mobile-overlay');
+        const open = sb.classList.contains('-translate-x-full');
+        sb.classList.toggle('-translate-x-full', !open);
+        ov.classList.toggle('hidden', !open);
+        setTimeout(() => ov.classList.toggle('opacity-0', !open), 10);
+    }
+    function showApiError(msg) {
+        const b = document.getElementById('api-error-banner');
+        document.getElementById('api-error-text').textContent = msg;
+        b.classList.remove('hidden');
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function bumpCounter(key) {
+        state.counters[key]++;
+        document.getElementById('cnt-search').textContent = state.counters.search;
+        document.getElementById('cnt-detail').textContent = state.counters.detail;
+        document.getElementById('cnt-geo').textContent = state.counters.geo;
+        document.getElementById('cnt-sv').textContent = state.counters.sv;
+    }
+
+    // ===================== KATEGORIE =====================
+    function renderCats() {
+        const wrap = document.getElementById('cat-chips');
+        const all = [...new Set([...CATEGORIES, ...state.cats])];
+        wrap.innerHTML = all.map(c =>
+            `<span class="cat-chip ${state.cats.has(c) ? 'on' : ''}" onclick="toggleCat('${esc(c).replace(/'/g, "\\'")}')">${esc(c)}</span>`
+        ).join('');
+        updateEstimate();
+    }
+    function toggleCat(c) { state.cats.has(c) ? state.cats.delete(c) : state.cats.add(c); renderCats(); }
+    function setAllCats(on) { state.cats = on ? new Set([...CATEGORIES, ...state.cats]) : new Set(); renderCats(); }
+    function addCustomCat() {
+        const inp = document.getElementById('inp-custom-cat');
+        const v = inp.value.trim().toLowerCase();
+        if (!v) return;
+        state.cats.add(v); inp.value = '';
+        renderCats();
+    }
+    function updateEstimate() {
+        const pages = parseInt(document.getElementById('inp-pages').value, 10);
+        const n = state.cats.size;
+        document.getElementById('est-requests').textContent = n ? `≈ ${n}–${n * pages} požadavků na hledání` : '';
+    }
+    document.getElementById('inp-pages').addEventListener('change', updateEstimate);
+
+    // ===================== GEOKÓDOVÁNÍ OBCE =====================
+    async function geocodePlace(query) {
+        const key = query.toLowerCase();
+        if (state.geoCache.has(key)) return state.geoCache.get(key);
+        const url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(query)
+            + '&region=cz&language=cs&components=country:CZ|country:SK&key=' + EFFECTIVE_API_KEY;
+        const r = await fetch(url);
+        const j = await r.json();
+        bumpCounter('geo');
+        if (j.status === 'REQUEST_DENIED') throw new Error('API klíč nemá povolené Geocoding API nebo je omezen na jinou doménu.');
+        if (!j.results || !j.results.length) throw new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres, např. „Jestřabí Lhota, okres Kolín".');
+        const res = j.results[0];
+        const loc = res.geometry.location;
+        let radius = 2500;
+        if (res.geometry.bounds || res.geometry.viewport) {
+            const b = res.geometry.bounds || res.geometry.viewport;
+            const dLat = Math.abs(b.northeast.lat - b.southwest.lat) * 111320 / 2;
+            const dLng = Math.abs(b.northeast.lng - b.southwest.lng) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
+            radius = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
         }
+        const out = { lat: loc.lat, lng: loc.lng, radius, label: res.formatted_address };
+        state.geoCache.set(key, out);
+        return out;
+    }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+    // ===================== HLEDÁNÍ (Places API New – Text Search, jen levná pole) =====================
+    const SEARCH_FIELDS = [
+        'places.id', 'places.displayName', 'places.formattedAddress', 'places.location',
+        'places.types', 'places.primaryTypeDisplayName', 'places.businessStatus', 'places.photos', 'nextPageToken'
+    ].join(',');
+
+    async function textSearch(query, geo, radius, pageToken) {
+        const body = {
+            textQuery: query,
+            pageSize: 20,
+            languageCode: 'cs',
+            locationBias: { circle: { center: { latitude: geo.lat, longitude: geo.lng }, radius: radius } }
+        };
+        if (pageToken) body.pageToken = pageToken;
+        const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': EFFECTIVE_API_KEY,
+                'X-Goog-FieldMask': SEARCH_FIELDS
+            },
+            body: JSON.stringify(body)
+        });
+        bumpCounter('search');
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            const msg = (err.error && err.error.message) || ('HTTP ' + r.status);
+            if (/API key|referer|referrer|PERMISSION/i.test(msg)) showApiError('Places API (New) odmítlo požadavek: ' + msg + ' – zkontrolujte, že je v Cloud Console povolené „Places API (New)" a doména je v povolených refererech, nebo vložte jiný klíč níže.');
+            throw new Error(msg);
+        }
+        return r.json();
+    }
+
+    function distMeters(aLat, aLng, bLat, bLng) {
+        const R = 6371000, toR = Math.PI / 180;
+        const dLat = (bLat - aLat) * toR, dLng = (bLng - aLng) * toR;
+        const s = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * toR) * Math.cos(bLat * toR) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(s));
+    }
+
+    async function runSearch() {
+        if (state.busy) return;
+        const place = document.getElementById('inp-place').value.trim();
+        if (!place) { showToast('Zadejte obec nebo město.'); return; }
+        if (!state.cats.size) { showToast('Vyberte alespoň jednu kategorii.'); return; }
+        const maxPages = parseInt(document.getElementById('inp-pages').value, 10);
+        state.busy = true;
+        setSearchBusy(true);
+        const prog = document.getElementById('search-progress'), progText = document.getElementById('search-progress-text');
+        prog.classList.remove('hidden');
+        try {
+            progText.textContent = 'Hledám obec „' + place + '"…';
+            const geo = await geocodePlace(place);
+            const radiusSel = document.getElementById('inp-radius').value;
+            const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
+            const cats = [...state.cats];
+            let added = 0, i = 0;
+            for (const cat of cats) {
+                i++;
+                progText.textContent = `(${i}/${cats.length}) ${cat} – ${geo.label}`;
+                let token = null, page = 0;
+                do {
+                    page++;
+                    let data;
+                    try { data = await textSearch(cat + ' ' + place, geo, radius, token); }
+                    catch (e) { console.warn('Search failed for', cat, e); break; }
+                    (data.places || []).forEach(p => {
+                        if (!p.id || state.results.has(p.id)) {
+                            if (p.id && state.results.has(p.id)) {
+                                const row = state.results.get(p.id);
+                                if (!row.cats.includes(cat)) row.cats.push(cat);
+                            }
+                            return;
+                        }
+                        const lat = p.location ? p.location.latitude : null;
+                        const lng = p.location ? p.location.longitude : null;
+                        // odfiltrovat výsledky daleko mimo zvolený okruh (Text Search bias není striktní)
+                        if (lat != null && distMeters(geo.lat, geo.lng, lat, lng) > radius * 1.6) return;
+                        state.results.set(p.id, {
+                            id: p.id,
+                            name: (p.displayName && p.displayName.text) || '—',
+                            address: p.formattedAddress || '',
+                            lat, lng,
+                            cats: [cat],
+                            typeLabel: (p.primaryTypeDisplayName && p.primaryTypeDisplayName.text) || '',
+                            status: p.businessStatus || 'OPERATIONAL',
+                            photoCount: Array.isArray(p.photos) ? p.photos.length : 0, // API vrací max 10
+                            phone: null, website: null, rating: null, ratingCount: null,
+                            detailLoaded: false, tour: null, selected: false,
+                            area: geo.label
+                        });
+                        added++;
+                    });
+                    token = data.nextPageToken || null;
+                } while (token && page < maxPages);
+            }
+            showToast(added ? `Přidáno ${added} nových firem (celkem ${state.results.size}).` : 'Nenašly se žádné nové firmy.');
+            renderTable();
+        } catch (e) {
+            showToast(e.message || 'Hledání selhalo.');
+        } finally {
+            state.busy = false;
+            setSearchBusy(false);
+            prog.classList.add('hidden');
+        }
+    }
+
+    function setSearchBusy(b) {
+        document.getElementById('btn-search').disabled = b;
+        document.getElementById('btn-search-icon').className = b ? 'fa-solid fa-circle-notch spin' : 'fa-solid fa-magnifying-glass';
+        document.getElementById('btn-search-label').textContent = b ? 'Hledám…' : 'Vyhledat';
+    }
+
+    // ===================== DETAILY (telefon, web, hodnocení – jen na vyžádání) =====================
+    const DETAIL_FIELDS = 'nationalPhoneNumber,internationalPhoneNumber,websiteUri,rating,userRatingCount';
+
+    async function loadDetail(id) {
+        const row = state.results.get(id);
+        if (!row || row.detailLoaded || row.detailLoading) return;
+        row.detailLoading = true;
+        renderTable();
+        try {
+            const r = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(id)
+                + '?fields=' + DETAIL_FIELDS + '&languageCode=cs&key=' + EFFECTIVE_API_KEY);
+            bumpCounter('detail');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            row.phone = d.nationalPhoneNumber || d.internationalPhoneNumber || null;
+            row.website = d.websiteUri || null;
+            row.rating = typeof d.rating === 'number' ? d.rating : null;
+            row.ratingCount = typeof d.userRatingCount === 'number' ? d.userRatingCount : null;
+            row.detailLoaded = true;
+        } catch (e) {
+            showToast('Detail se nepodařilo načíst (' + (e.message || '') + ').');
+        } finally {
+            row.detailLoading = false;
+            renderTable();
+        }
+    }
+
+    async function loadDetailsForFiltered() {
+        if (state.busy) return;
+        const pending = filteredRows().filter(r => !r.detailLoaded);
+        if (!pending.length) { showToast('Kontakty všech zobrazených firem už jsou načtené.'); return; }
+        if (pending.length > 25 && !confirm('Načíst kontakty pro ' + pending.length + ' firem? Každá firma = 1 placený požadavek na Places API.')) return;
+        state.busy = true;
+        let done = 0;
+        for (const row of pending) {
+            await loadDetail(row.id);
+            done++;
+            if (done % 5 === 0) showToast('Načteno ' + done + ' / ' + pending.length + '…');
+            await new Promise(res => setTimeout(res, 120));
+        }
+        state.busy = false;
+        showToast('Hotovo – kontakty načteny pro ' + done + ' firem.');
+        renderTable();
+    }
+
+    // ===================== VIRTUÁLKY (Street View metadata – zdarma) =====================
+    let svService = null;
+    function getSv() {
+        if (!svService && window.google && google.maps) svService = new google.maps.StreetViewService();
+        return svService;
+    }
+    function checkTour(row) {
+        return new Promise(resolve => {
+            const sv = getSv();
+            if (!sv || row.lat == null) { row.tour = 'unknown'; resolve(); return; }
+            sv.getPanorama({ location: { lat: row.lat, lng: row.lng }, radius: 25, preference: 'nearest', sources: ['default'] }, (data, status) => {
+                bumpCounter('sv');
+                if (status === 'OK' && data && data.copyright) {
+                    row.tour = /google/i.test(data.copyright) ? 'no' : 'yes';
+                    row.tourAuthor = /google/i.test(data.copyright) ? null : data.copyright.replace(/^©\s*\d*\s*/, '');
+                } else {
+                    row.tour = 'no';
+                }
+                resolve();
+            });
+        });
+    }
+    async function checkAllTours() {
+        if (state.busy) return;
+        const pending = filteredRows().filter(r => r.tour === null);
+        if (!pending.length) { showToast('Virtuálky u zobrazených firem už jsou ověřené.'); return; }
+        state.busy = true;
+        showToast('Ověřuji virtuálky u ' + pending.length + ' firem…');
+        for (let i = 0; i < pending.length; i++) {
+            await checkTour(pending[i]);
+            if ((i + 1) % 10 === 0) renderTable();
+            await new Promise(res => setTimeout(res, 90));
+        }
+        state.busy = false;
+        renderTable();
+        const withTour = pending.filter(r => r.tour === 'yes').length;
+        showToast('Hotovo – panorama/prohlídku má ' + withTour + ' z ' + pending.length + ' ověřených firem.');
+    }
+
+    // ===================== TABULKA =====================
+    function isWeak(r) {
+        if (!r.detailLoaded) return false;
+        let s = 0;
+        if (!r.website) s++;
+        if (!r.phone) s++;
+        if (r.photoCount <= 2) s++;
+        if ((r.ratingCount || 0) < 5) s++;
+        return s >= 3;
+    }
+    function filteredRows() {
+        const q = document.getElementById('flt-text').value.trim().toLowerCase();
+        const noTour = document.getElementById('flt-notour').checked;
+        const noWeb = document.getElementById('flt-noweb').checked;
+        const weak = document.getElementById('flt-weak').checked;
+        let rows = [...state.results.values()];
+        if (q) rows = rows.filter(r => (r.name + ' ' + r.address + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
+        if (noTour) rows = rows.filter(r => r.tour === 'no');
+        if (noWeb) rows = rows.filter(r => r.detailLoaded && !r.website);
+        if (weak) rows = rows.filter(isWeak);
+        const { key, dir } = state.sort;
+        rows.sort((a, b) => {
+            if (key === 'name') return dir * a.name.localeCompare(b.name, 'cs');
+            if (key === 'photos') return dir * (a.photoCount - b.photoCount);
+            if (key === 'rating') return dir * ((a.rating || -1) - (b.rating || -1));
+            return 0;
+        });
+        return rows;
+    }
+    function setSort(key) {
+        state.sort.dir = state.sort.key === key ? -state.sort.dir : (key === 'name' ? 1 : 1);
+        state.sort.key = key;
+        renderTable();
+    }
+    function toggleAll(on) { filteredRows().forEach(r => r.selected = on); renderTable(); }
+    function toggleRow(id, on) { const r = state.results.get(id); if (r) r.selected = on; }
+
+    function mapsLink(id) { return 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(id); }
+
+    function renderTable() {
+        const rows = filteredRows();
+        document.getElementById('empty-state').classList.toggle('hidden', state.results.size > 0);
+        document.getElementById('results-wrap').classList.toggle('hidden', state.results.size === 0);
+        const hc = document.getElementById('header-count');
+        hc.classList.toggle('hidden', state.results.size === 0);
+        hc.classList.toggle('flex', state.results.size > 0);
+        document.getElementById('header-count-value').textContent = rows.length === state.results.size ? state.results.size : rows.length + ' / ' + state.results.size;
+        document.getElementById('detail-pending-count').textContent = rows.filter(r => !r.detailLoaded).length;
+        document.getElementById('results-empty').classList.toggle('hidden', rows.length > 0 || state.results.size === 0);
+
+        document.getElementById('results-body').innerHTML = rows.map(r => {
+            const badges = [];
+            if (r.status === 'CLOSED_PERMANENTLY') badges.push('<span class="badge b-red">Trvale zavřeno</span>');
+            else if (r.status === 'CLOSED_TEMPORARILY') badges.push('<span class="badge b-amber">Dočasně zavřeno</span>');
+            if (r.tour === 'no') badges.push('<span class="badge b-green"><i class="fa-solid fa-street-view"></i> bez virtuálky</span>');
+            if (r.tour === 'yes') badges.push('<span class="badge b-gray" title="' + esc(r.tourAuthor || '') + '"><i class="fa-solid fa-street-view"></i> má panorama</span>');
+            if (r.photoCount <= 2) badges.push('<span class="badge b-amber">málo fotek</span>');
+            if (r.detailLoaded && !r.website) badges.push('<span class="badge b-green">bez webu</span>');
+            if (isWeak(r)) badges.push('<span class="badge b-red">nespravovaný?</span>');
+
+            let contact;
+            if (r.detailLoading) contact = '<i class="fa-solid fa-circle-notch spin text-gray-300"></i>';
+            else if (r.detailLoaded) {
+                contact = (r.phone ? '<a href="tel:' + esc(r.phone.replace(/\s/g, '')) + '" class="text-gray-800 font-medium hover:text-brand-600 whitespace-nowrap"><i class="fa-solid fa-phone text-[10px] text-gray-400 mr-1"></i>' + esc(r.phone) + '</a>' : '<span class="text-gray-300">bez telefonu</span>')
+                    + '<br>' + (r.website ? '<a href="' + esc(r.website) + '" target="_blank" rel="noopener" class="text-xs text-brand-600 hover:underline break-all">' + esc(r.website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) + '</a>' : '<span class="text-xs text-gray-300">bez webu</span>');
+            } else {
+                contact = '<button onclick="loadDetail(\'' + esc(r.id) + '\')" class="border border-gray-300 bg-white text-gray-500 py-1 px-2.5 rounded-lg text-[11px] font-semibold hover:bg-gray-50 transition"><i class="fa-solid fa-download mr-1"></i>načíst</button>';
+            }
+
+            const rating = r.detailLoaded
+                ? (r.rating != null ? '<span class="font-semibold text-gray-800">' + r.rating.toFixed(1) + ' <i class="fa-solid fa-star text-amber-400 text-[10px]"></i></span> <span class="text-xs text-gray-400">(' + (r.ratingCount || 0) + ')</span>' : '<span class="text-gray-300">–</span>')
+                : '<span class="text-gray-300 text-xs">–</span>';
+
+            return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
+                <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
+                <td class="px-2 py-3">
+                    <p class="font-semibold text-gray-900 leading-tight">${esc(r.name)}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${esc(r.address)}</p>
+                </td>
+                <td class="px-2 py-3 text-xs text-gray-500">${esc(r.typeLabel || r.cats[0])}<br><span class="text-gray-300">${esc(r.cats.join(', '))}</span></td>
+                <td class="px-2 py-3 text-sm ${r.photoCount <= 2 ? 'text-amber-600 font-semibold' : 'text-gray-600'}">${r.photoCount >= 10 ? '10+' : r.photoCount}</td>
+                <td class="px-2 py-3">${rating}</td>
+                <td class="px-2 py-3 text-sm">${contact}</td>
+                <td class="px-2 py-3"><div class="flex flex-wrap gap-1 max-w-[190px]">${badges.join('')}</div></td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" title="Otevřít zápis na Googlu" class="inline-flex w-8 h-8 border border-gray-200 rounded-lg items-center justify-center text-gray-500 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-solid fa-map-location-dot"></i></a>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ===================== EXPORT CSV =====================
+    function exportCsv() {
+        const all = filteredRows();
+        const sel = all.filter(r => r.selected);
+        const rows = sel.length ? sel : all;
+        if (!rows.length) { showToast('Není co exportovat.'); return; }
+        const head = ['Název', 'Kategorie', 'Adresa', 'Oblast', 'Telefon', 'Web', 'Hodnocení', 'Počet recenzí', 'Fotky', 'Virtuálka', 'Stav', 'Odkaz na zápis'];
+        const line = r => [
+            r.name, r.typeLabel || r.cats.join(', '), r.address, r.area || '',
+            r.phone || '', r.website || '',
+            r.rating != null ? String(r.rating).replace('.', ',') : '', r.ratingCount != null ? r.ratingCount : '',
+            r.photoCount >= 10 ? '10+' : r.photoCount,
+            r.tour === 'yes' ? 'má' : (r.tour === 'no' ? 'nemá' : 'neověřeno'),
+            r.status === 'OPERATIONAL' ? 'v provozu' : r.status,
+            mapsLink(r.id)
+        ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(';');
+        const csv = '\uFEFF' + head.join(';') + '\n' + rows.map(line).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'leady-' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('Exportováno ' + rows.length + ' firem' + (sel.length ? ' (jen vybrané)' : '') + '.');
+    }
+
+    // ===================== MAPS JS API (jen kvůli Street View metadatům) =====================
+    window.initGoogleServices = function () { /* StreetViewService se vytváří líně */ };
+    (function loadGoogleMaps() {
+        const s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + EFFECTIVE_API_KEY + '&language=cs&callback=initGoogleServices';
+        s.onerror = () => showApiError('Nepodařilo se načíst Google Maps API – ověření virtuálek nebude fungovat. Zkontrolujte API klíč.');
+        document.head.appendChild(s);
+    })();
+
+    // ===================== INIT =====================
+    renderCats();
     </script>
 </body>
 </html>
