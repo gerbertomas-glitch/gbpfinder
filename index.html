@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = { theme: { extend: {
@@ -58,15 +59,17 @@
             <button onclick="runDiagnostics()" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left text-gray-600 hover:bg-gray-100">
                 <i class="fa-solid fa-stethoscope w-5 text-center"></i> Diagnostika API
             </button>
+            <button onclick="scrollToMyList()" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition text-left text-gray-600 hover:bg-gray-100">
+                <i class="fa-solid fa-star w-5 text-center"></i> Můj seznam <span id="nav-mylist-count" class="badge b-green ml-auto">0</span>
+            </button>
 
             <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Spotřeba (relace)</p>
             <div class="mx-3 card-minimal !shadow-none p-3 text-xs text-gray-600 space-y-1.5">
                 <div class="flex justify-between"><span>Hledání <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-free" class="text-gray-900">0</strong></div>
-                <div class="flex justify-between"><span>Hledání s názvy <span class="text-gray-400">(5 000/měs.)</span></span><strong id="cnt-named" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Geokódování <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Našeptávač <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-ac" class="text-gray-900">0</strong></div>
             </div>
-            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy i mapa jsou zdarma bez limitu. Limit (společný pro celý tým) čerpá jen volitelné načtení názvů, geokódování adresy a našeptávač. Bod zvolený kliknutím do mapy nečerpá nic.</p>
+            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy, mapa i náhledy profilů jsou zdarma bez limitu. Limit (společný pro celý tým) čerpá jen geokódování adresy a našeptávač. Bod zvolený kliknutím do mapy nečerpá nic.</p>
         </nav>
         <div class="p-4 border-t border-border bg-gray-50">
             <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
@@ -116,6 +119,15 @@
                             </div>
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">Země</label>
+                            <select id="inp-country" onchange="state.lastGeo=null" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
+                                <option value="cz" selected>Česko</option>
+                                <option value="sk">Slovensko</option>
+                                <option value="hu">Maďarsko</option>
+                                <option value="cy">Kypr</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-gray-600 mb-1.5">Oblast</label>
                             <select id="inp-radius" onchange="onRadiusChange()" class="p-2.5 border border-gray-300 rounded-lg text-sm outline-none bg-white cursor-pointer w-full lg:w-auto">
                                 <option value="auto" selected>Auto (hranice obce)</option>
@@ -127,22 +139,13 @@
                                 <option value="10000">okruh 10 km</option>
                             </select>
                         </div>
-                        <button onclick="previewArea()" title="Zobrazí zvolenou oblast na mapě, ještě před spuštěním skenu" class="border border-gray-300 bg-white text-gray-600 py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-gray-50 transition inline-flex items-center justify-center gap-2 shrink-0">
-                            <i class="fa-regular fa-eye"></i> Náhled oblasti
-                        </button>
                         <button id="btn-search" onclick="runSearch()" class="bg-brand-500 text-white py-2.5 px-6 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center justify-center gap-2 shrink-0">
                             <i id="btn-search-icon" class="fa-solid fa-magnifying-glass"></i> <span id="btn-search-label">Vyhledat</span>
                         </button>
                     </div>
 
                     <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-                        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="Přidá druhou vrstvu specifičtějších výrazů z oficiálního seznamu kategorií. Sken trvá déle, ale síto je nejhustší možné. Stále zdarma.">
-                            <input type="checkbox" id="inp-deep"> Důkladný sken (+<span id="extra-count">–</span> výrazů) <span class="badge b-green">zdarma</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="Názvy firem nejsou v neomezené bezplatné úrovni. Zaškrtnutím se hledání účtuje do společného limitu 5 000 dotazů měsíčně pro celý tým.">
-                            <input type="checkbox" id="inp-names"> Načíst i názvy firem <span class="badge b-amber">čerpá limit 5 000/měs.</span>
-                        </label>
-                        <span class="text-[11px] text-gray-400">Sada výrazů je odvozená z oficiálního seznamu kategorií Google Business Profile pro ČR.</span>
+                        <span class="text-[11px] text-gray-400">Sken vždy běží v důkladném režimu (<span id="query-count">–</span> výrazů dle země, odvozeno z oficiálního seznamu kategorií Google Business Profile) a sám se přizpůsobí velikosti oblasti. Vše zdarma a bez limitu.</span>
                     </div>
                     <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2">
                         <i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span>
@@ -157,8 +160,7 @@
                         <button id="pick-btn" onclick="togglePickMode()" class="border border-gray-300 bg-white text-gray-600 py-1.5 px-3 rounded-lg text-[11px] font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5">
                             <i class="fa-solid fa-map-pin"></i> Zvolit bod kliknutím do mapy
                         </button>
-                        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#16a34a"></span> zápis ve zvolené oblasti</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#f59e0b"></span> mimo oblast</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#16a34a"></span> firemní zápis</span>
                         <span class="text-gray-400">· poloha je přibližná · špendlík lze přetáhnout · mapa © OpenStreetMap</span>
                     </div>
                 </div>
@@ -196,8 +198,80 @@
                     <div id="results-empty" class="hidden px-5 py-10 text-center text-sm text-gray-400">Žádná firma neodpovídá filtrům.</div>
                 </div>
 
+                <!-- MŮJ SEZNAM -->
+                <div id="mylist-card" class="hidden card-minimal overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
+                        <h2 class="text-sm font-bold text-gray-900"><i class="fa-solid fa-star text-amber-400 mr-1.5"></i>Můj seznam leadů <span id="mylist-count" class="badge b-gray">0</span></h2>
+                        <span class="flex-1"></span>
+                        <button onclick="exportXlsx()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-excel"></i> Export XLS
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm min-w-[860px]">
+                            <thead>
+                                <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                    <th class="px-4 py-3">Lead</th>
+                                    <th class="px-2 py-3">Kontaktní osoba</th>
+                                    <th class="px-2 py-3">Telefon</th>
+                                    <th class="px-2 py-3">E-mail</th>
+                                    <th class="px-2 py-3">Poznámka</th>
+                                    <th class="px-4 py-3 text-right">Akce</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mylist-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </main>
+    </div>
+
+    <!-- MODAL: NÁHLED PROFILU -->
+    <div id="profile-modal" class="hidden fixed inset-0 z-[70]">
+        <div class="absolute inset-0 bg-gray-900/60" onclick="closeProfile()"></div>
+        <div class="absolute inset-x-3 top-4 bottom-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[860px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3 shrink-0">
+                <h3 class="font-bold text-gray-900 text-sm">Náhled firemního profilu</h3>
+                <a id="modal-maps-link" href="#" target="_blank" rel="noopener" class="text-xs text-brand-600 font-semibold hover:underline">otevřít v Google Mapách ↗</a>
+                <span class="flex-1"></span>
+                <button onclick="closeProfile()" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <iframe id="modal-iframe" class="w-full" style="height:340px;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+                <div class="p-5">
+                    <div class="flex items-center gap-3 mb-4 flex-wrap">
+                        <p class="text-sm font-bold text-gray-900">Přidat do mého seznamu</p>
+                        <div id="modal-stars" class="flex items-center gap-0.5"></div>
+                        <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký lead</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Kontaktní osoba</label>
+                            <input id="modal-person" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="Jan Novák">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Telefon</label>
+                            <input id="modal-phone" type="tel" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="+420 …">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">E-mail</label>
+                            <input id="modal-email" type="email" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="info@…">
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Osobní poznámka</label>
+                            <textarea id="modal-note" rows="2" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500 resize-y" placeholder="např. majitel má zájem o virtuálku, zavolat v pondělí…"></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-2 flex-wrap">
+                        <button onclick="saveLead()" class="bg-brand-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-solid fa-plus mr-1.5"></i>Uložit do seznamu</button>
+                        <button id="modal-remove" onclick="removeLead()" class="hidden border border-red-200 text-red-600 py-2 px-4 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Odebrat ze seznamu</button>
+                        <span class="text-[11px] text-gray-400">Seznam se ukládá jen ve vašem prohlížeči.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-lg shadow-xl opacity-0 pointer-events-none transition-all duration-300 z-[80] flex items-center gap-3">
@@ -253,12 +327,67 @@
         'vývozce','dovozce','distributor','vydavatel','stavitel','odhadce','učitel','umělec','designér','organizátor','chirurg','fakulta','univerzita','vysoká škola','soud','archiv','letiště','základna','elektrárna','mlýn','kovář','loděnice','přístaviště','tábor','úpravna','broušení','zpracování','pojištění','rezervace','park','zahrada','botanická zahrada','kaple','klášter','synagoga','katedrála','modlitebna','stánek','občerstvení','komplex','bydlení','vlakové nádraží','autobusové nádraží','kurt','ranč','dráha','hvězdárna','zoo','zámek','hrad','rozhledna','památník','turistická atrakce','místo konání akcí','svatby','hlídání dětí','dětský tábor','strojírenství','slévárna','fotovoltaika','tepelná čerpadla','plastová okna','žaluzie','ploty','bazény','zavlažování','kácení stromů','deratizace','ostraha','bezpečnostní agentura','detektivní kancelář','výdejní místo','gravírování','rámování','krmiva','hodinový manžel','chovatel','pěstování','tisk','řezání','osobní trenér','jazykové kurzy','psí salon','svářečství','izolace','fasády','lešení','jeřábnické práce','zemní práce','autopůjčovna dodávek','recyklace','výkup'
     ];
 
+    // Slovensko – překlad sady (bude zpřesněno podle oficiálního exportu kategorií pro SK)
+    const QUERIES_SK = [
+        'firma','firmy','obchod','predajňa','služby','výroba','veľkoobchod','kancelária','remeselník','podnik','prevádzka','servis','predaj','centrum','štúdio','salón','agentúra','ateliér','dielňa','sklad','družstvo','s.r.o.','dodávateľ','výrobca','spoločnosť','klub','autosalón','klinika','ambulancia','ordinácia','ihrisko','organizácia','spolok','združenie','poradca','poradenstvo','konzultant','inžinier','technik','kurzy','prenájom','požičovňa','čistenie','starostlivosť','inštruktor','tréner','lektor','stredisko','zariadenie','nemocnica','terapeut','terapia','stanica','areál','kúpele','poskytovateľ','správa','údržba','závod','oddiel','útulok','laboratórium','akadémia','poradňa','opravy','doprava','preprava','domov','ústav','maklér','zubný','právne služby','potreby','vybavenie','cestovná kancelária','montáž',
+        'úrad','obecný úrad','mestský úrad','magistrát','úrad práce','daňový úrad','kataster','pošta','polícia','mestská polícia','hasiči','knižnica','kultúrny dom','informačné centrum','charita','domov dôchodcov','opatrovateľská služba','zberný dvor','technické služby','fara','kostol',
+        'škôlka','materská škola','škola','základná škola','stredná škola','gymnázium','učilište','základná umelecká škola','jazyková škola','autoškola','doučovanie',
+        'reštaurácia','krčma','piváreň','kaviareň','cukráreň','pekáreň','bistro','pizzeria','rýchle občerstvenie','catering','vináreň','bar','vinotéka','čajovňa','zmrzlina','bufet','jedáleň','rozvoz jedla','kebab',
+        'hotel','penzión','ubytovanie','apartmány','kemp','ubytovňa',
+        'autoservis','pneuservis','autobazár','autodiely','autoumyváreň','čerpacia stanica','autopožičovňa','taxi','autodoprava','STK','emisná kontrola','autolakovňa','karosáreň','autoelektrikár','autosklo','odťahová služba','motoservis','predaj motocyklov','cykloservis','predajňa bicyklov','poľnohospodárska technika','vrakovisko','kuriér','logistika','špedícia',
+        'kaderníctvo','holičstvo','barbershop','kozmetika','nechtové štúdio','pedikúra','masáže','solárium','tetovanie','fitnes','wellness','sauna','joga','svadobný salón','krajčírstvo','oprava obuvi',
+        'lekár','všeobecný lekár','detský lekár','zubár','gynekológia','ortopédia','kožný lekár','očný lekár','psychológ','psychiater','logopéd','fyzioterapia','rehabilitácia','zdravotné stredisko','poliklinika','veterinár','lekáreň','optika',
+        'potraviny','večierka','supermarket','mäsiarstvo','ovocie zelenina','kvetinárstvo','drogéria','papiernictvo','kníhkupectvo','hračkárstvo','oblečenie','obuv','klenotníctvo','hodinárstvo','elektro','nábytok','železiarstvo','stavebniny','záhradníctvo','záhradná technika','chovateľské potreby','rybárske potreby','zbrane strelivo','trafika','second hand','bazár','záložňa','starožitnosti','galantéria','látky','domáce potreby','farby laky','hobby market','palivové drevo',
+        'inštalatér','kúrenár','elektrikár','maliar','zámočník','stolár','tesár','pokrývač','klampiar','kominár','sklenár','murár','sadrokartón','podlahár','obkladač','čalúnnictvo','kováč','kovovýroba','stavebná firma','projekčná kancelária','architekt','geodet','revízie','vzduchotechnika','klimatizácia','sťahovanie','čistiareň','práčovňa','opravovňa','upratovacie služby','požičovňa náradia','kontajnery','kovošrot','píla','drevovýroba',
+        'účtovník','daňový poradca','právnik','advokát','advokátska kancelária','notár','exekútor','realitná kancelária','poisťovňa','banka','zmenáreň','finančný poradca','IT služby','softvérová firma','webdizajn','marketing','reklamná agentúra','tlačiareň','copy centrum','fotograf','pracovná agentúra','prekladateľ','pohrebná služba','stávková kancelária',
+        'športová hala','športový klub','futbalový klub','telocvičňa','bazén','kúpalisko','bowling','kino','divadlo','múzeum','galéria','strelnica','paintball','tanečné štúdio','jazdiareň','herňa','farma','gazdovstvo','včelárstvo','pálenica','vinárstvo','pivovar','poľnohospodárske družstvo',
+        'fotovoltika','tepelné čerpadlá','plastové okná','žalúzie','ploty','bazény','deratizácia','SBS','výdajné miesto','gravírovanie','rámovanie','krmivá','zváračské práce','izolácie','fasády','lešenie','zemné práce','recyklácia','výkup','zámok','kaštieľ','rozhľadňa','pamätník','vlaková stanica','autobusová stanica'
+    ];
+    // Maďarsko – překlad sady (bude zpřesněno podle oficiálního exportu kategorií pro HU)
+    const QUERIES_HU = [
+        'cég','vállalkozás','üzlet','bolt','szolgáltatás','gyártó','nagykereskedés','iroda','műhely','raktár','központ','stúdió','szalon','ügynökség','szerviz','beszállító','forgalmazó','klub','klinika','rendelő','kórház','szervezet','egyesület','tanácsadó','mérnök','technikus','tanfolyam','bérlés','kölcsönző','takarítás','oktató','edző','gondozás','intézet','állomás','javítás','karbantartás','fürdő','szövetkezet','kft',
+        'önkormányzat','polgármesteri hivatal','kormányablak','munkaügyi központ','adóhivatal','posta','rendőrség','tűzoltóság','könyvtár','művelődési ház','közösségi ház','templom','plébánia','idősek otthona','hulladékudvar',
+        'óvoda','bölcsőde','iskola','általános iskola','középiskola','gimnázium','szakiskola','zeneiskola','nyelviskola','autósiskola','egyetem','korrepetálás',
+        'étterem','kocsma','söröző','kávézó','cukrászda','pékség','bisztró','pizzéria','gyorsétterem','büfé','borozó','bár','teázó','fagylaltozó','ételkiszállítás','étkezde','gyros',
+        'hotel','szálloda','panzió','szállás','apartman','kemping','vendégház',
+        'autószerviz','gumiszerviz','autókereskedés','autóalkatrész','autómosó','benzinkút','autókölcsönző','taxi','fuvarozás','műszaki vizsga','autófényezés','karosszéria','autóvillamosság','autóüveg','autómentő','motorszerviz','kerékpárszerviz','kerékpárbolt','mezőgazdasági gépek','autóbontó','futárszolgálat','logisztika','szállítmányozás',
+        'fodrász','fodrászat','borbély','kozmetika','műköröm','pedikűr','masszázs','szolárium','tetoválás','fitnesz','wellness','szauna','jóga','esküvői ruhaszalon','varroda','cipőjavítás',
+        'orvos','háziorvos','gyermekorvos','fogorvos','fogászat','nőgyógyász','ortopédia','bőrgyógyász','szemész','pszichológus','fizioterápia','rehabilitáció','rendelőintézet','állatorvos','gyógyszertár','optika',
+        'élelmiszerbolt','kisbolt','szupermarket','hentes','zöldséges','virágbolt','drogéria','papírbolt','könyvesbolt','játékbolt','ruházati bolt','cipőbolt','ékszerbolt','órás','műszaki áruház','bútorbolt','vasáru','építőanyag','kertészet','kertigép','állateledel','horgászbolt','fegyverbolt','trafik','dohánybolt','használtruha','zálogház','régiségbolt','rövidáru','háztartási bolt','festékbolt','barkácsáruház','tűzifa',
+        'vízvezeték szerelő','fűtésszerelő','villanyszerelő','festő','lakatos','asztalos','ács','tetőfedő','bádogos','kéményseprő','üveges','kőműves','gipszkarton','burkoló','kárpitos','kovács','fémmegmunkálás','építőipari cég','építész','földmérő','klíma','költöztetés','ruhatisztító','mosoda','szerszámkölcsönző','konténer','fémhulladék','fűrészüzem','famegmunkálás',
+        'könyvelő','adótanácsadó','ügyvéd','ügyvédi iroda','közjegyző','végrehajtó','ingatlaniroda','biztosító','bank','pénzváltó','pénzügyi tanácsadó','informatika','szoftverfejlesztés','webdesign','marketing','reklámügynökség','nyomda','fénymásolás','fotós','munkaerő közvetítő','fordító','temetkezés','fogadóiroda',
+        'sportcsarnok','sportklub','focipálya','tornaterem','uszoda','strand','bowling','mozi','színház','múzeum','galéria','lőtér','tánciskola','lovarda','játékterem','tanya','méhészet','pálinkafőzde','borászat','sörfőzde','termelői piac',
+        'napelem','hőszivattyú','műanyag ablak','redőny','kerítés','medence','rovarirtás','vagyonvédelem','csomagpont','gravírozás','képkeretezés','takarmány','hegesztés','szigetelés','állványozás','földmunka','újrahasznosítás','felvásárlás','vár','kastély','kilátó','emlékmű','vasútállomás','buszpályaudvar'
+    ];
+    // Kypr – angličtina + řečtina (bude zpřesněno podle oficiálního exportu kategorií pro CY)
+    const QUERIES_CY = [
+        'company','business','shop','store','services','manufacturer','wholesale','office','workshop','warehouse','centre','studio','salon','agency','supplier','distributor','club','clinic','hospital','organisation','association','consultant','engineer','technician','courses','rental','hire','cleaning','instructor','coach','care','institute','station','repairs','maintenance','ltd',
+        'municipality','town hall','post office','police','fire station','library','community centre','church','monastery','mosque','charity','nursing home',
+        'kindergarten','nursery','school','primary school','high school','private institute','language school','driving school','university','tutoring',
+        'restaurant','tavern','pub','cafe','coffee shop','bakery','pastry shop','bistro','pizzeria','fast food','catering','wine bar','bar','ice cream','food delivery','kebab','meze',
+        'hotel','apartments','accommodation','camping','guest house','villas',
+        'car service','garage','tyre service','car dealer','car parts','car wash','petrol station','car rental','taxi','transport','vehicle inspection','car bodyshop','car electrician','car glass','towing','motorbike service','bicycle shop','agricultural machinery','scrapyard','courier','logistics','shipping',
+        'hairdresser','barber','beauty salon','nail salon','pedicure','massage','solarium','tattoo','gym','fitness','wellness','spa','sauna','yoga','wedding dresses','tailor','shoe repair',
+        'doctor','general practitioner','pediatrician','dentist','dental clinic','gynecologist','orthopedic','dermatologist','ophthalmologist','psychologist','physiotherapy','rehabilitation','medical centre','veterinary','pharmacy','optician',
+        'supermarket','mini market','grocery','butcher','greengrocer','fruit market','florist','stationery','bookshop','toy shop','clothing','shoes','jewellery','watchmaker','electronics','furniture','hardware store','building materials','garden centre','pet shop','fishing tackle','gun shop','kiosk','periptero','second hand','pawnshop','antiques','haberdashery','fabrics','household goods','paint shop','DIY store','firewood',
+        'plumber','heating engineer','electrician','painter','locksmith','carpenter','roofer','glazier','builder','plasterer','tiling','upholstery','blacksmith','metalwork','construction company','architect','surveyor','air conditioning','removals','dry cleaning','laundry','cleaning services','tool hire','skip hire','scrap metal','sawmill','joinery',
+        'accountant','tax advisor','auditor','lawyer','law firm','notary','real estate','estate agent','insurance','bank','currency exchange','financial advisor','IT services','software','web design','marketing','advertising agency','printing','copy shop','photographer','recruitment agency','translator','funeral services','betting shop',
+        'sports club','football club','swimming pool','beach bar','bowling','cinema','theatre','museum','gallery','shooting range','dance school','riding school','farm','apiary','winery','brewery','distillery','farmers market',
+        'solar panels','heat pumps','windows','shutters','fencing','pools','pest control','security','parcel point','engraving','framing','animal feed','welding','insulation','scaffolding','excavation','recycling','castle','viewpoint','monument','bus station','port','marina',
+        'εταιρεία','κατάστημα','υπηρεσίες','εστιατόριο','ταβέρνα','καφετέρια','φούρνος','ζαχαροπλαστείο','ξενοδοχείο','κομμωτήριο','κουρείο','ιατρός','οδοντίατρος','φαρμακείο','κτηνίατρος','υπεραγορά','κρεοπωλείο','ανθοπωλείο','υδραυλικός','ηλεκτρολόγος','ξυλουργός','λογιστής','δικηγόρος','ασφάλειες','συνεργείο αυτοκινήτων','πρατήριο βενζίνης','φροντιστήριο','σχολή οδηγών','γυμναστήριο','εκκλησία','δήμος','ταχυδρομείο','αρτοποιείο','περίπτερο'
+    ];
+    const QUERY_SETS = { cz: ALL_QUERIES.concat(EXTRA_QUERIES), sk: QUERIES_SK, hu: QUERIES_HU, cy: QUERIES_CY };
+    const COUNTRY_META = { cz: { region: 'cz', lang: 'cs' }, sk: { region: 'sk', lang: 'sk' }, hu: { region: 'hu', lang: 'hu' }, cy: { region: 'cy', lang: 'en' } };
+
     const state = {
         results: new Map(),
         geoCache: new Map(),
-        counters: { free: 0, named: 0, geo: 0, ac: 0 },
+        counters: { free: 0, geo: 0, ac: 0 },
         busy: false,
         cancel: false,
+        myLeads: new Map(),
+        modalId: null,
+        modalStars: 0,
         custom: null,     // {lat,lng} – bod zvolený kliknutím do mapy / přetažením špendlíku
         lastGeo: null,    // poslední vyřešený střed (pro živý náhled při změně okruhu)
         pickMode: false
@@ -289,7 +418,6 @@
     function bumpCounter(key) {
         state.counters[key]++;
         document.getElementById('cnt-free').textContent = state.counters.free;
-        document.getElementById('cnt-named').textContent = state.counters.named;
         document.getElementById('cnt-geo').textContent = state.counters.geo;
         document.getElementById('cnt-ac').textContent = state.counters.ac;
     }
@@ -339,7 +467,7 @@
             const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY },
-                body: JSON.stringify({ input: q, languageCode: 'cs', includedRegionCodes: ['cz', 'sk'] })
+                body: JSON.stringify({ input: q, languageCode: COUNTRY_META[document.getElementById('inp-country').value].lang, includedRegionCodes: [COUNTRY_META[document.getElementById('inp-country').value].region] })
             });
             bumpCounter('ac');
             if (!r.ok) {
@@ -423,10 +551,11 @@
     }
 
     function geocodePlace(query) {
-        const key = query.toLowerCase();
+        const country = document.getElementById('inp-country').value;
+        const key = country + '|' + query.toLowerCase();
         if (state.geoCache.has(key)) return Promise.resolve(state.geoCache.get(key));
         return mapsReady.then(() => new Promise((resolve, reject) => {
-            new google.maps.Geocoder().geocode({ address: query, region: 'cz' }, (results, status) => {
+            new google.maps.Geocoder().geocode({ address: query, region: COUNTRY_META[country].region }, (results, status) => {
                 bumpCounter('geo');
                 if (status === 'REQUEST_DENIED') { reject(new Error('Geokódování odmítnuto – zkontrolujte povolení Geocoding API.')); return; }
                 if (status !== 'OK' || !results || !results.length) { reject(new Error('„' + query + '" se nepodařilo najít. Zkuste upřesnit adresu nebo přidat okres.')); return; }
@@ -451,7 +580,7 @@
     }
 
     // ===================== HLEDÁNÍ (Places API New – Text Search) =====================
-    async function searchPlaces(query, rect, maxPages, withNames) {
+    async function searchPlaces(query, rect, maxPages) {
         const items = [];
         let token = null, page = 0, truncated = false;
         do {
@@ -463,11 +592,11 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Goog-Api-Key': EFFECTIVE_API_KEY,
-                    'X-Goog-FieldMask': withNames ? 'places.id,places.displayName,nextPageToken' : 'places.id,nextPageToken'
+                    'X-Goog-FieldMask': 'places.id,nextPageToken'
                 },
                 body: JSON.stringify(body)
             });
-            bumpCounter(withNames ? 'named' : 'free');
+            bumpCounter('free');
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
                 const msg = (err.error && err.error.message) || ('HTTP ' + r.status);
@@ -475,7 +604,7 @@
                 throw new Error(msg);
             }
             const j = await r.json();
-            (j.places || []).forEach(p => { if (p.id) items.push({ id: p.id, name: (p.displayName && p.displayName.text) || null }); });
+            (j.places || []).forEach(p => { if (p.id) items.push({ id: p.id }); });
             token = j.nextPageToken || null;
             truncated = !!token;
         } while (token && page < maxPages);
@@ -488,17 +617,17 @@
     // Adaptivní sken jednoho dotazu: pokud je oblast „plná" (60 výsledků a dál by bylo), rozdělí se na čtvrtiny.
     const SCAN_MAX_DEPTH = 4;
     const SCAN_MIN_HALF_M = 220;
-    async function scanQuery(q, rect, depth, withNames, register) {
+    async function scanQuery(q, rect, depth, register) {
         if (state.cancel) return;
         let res;
-        try { res = await searchPlaces(q, rect, 3, withNames); }
+        try { res = await searchPlaces(q, rect, 3); }
         catch (e) { throw e; }
         res.items.forEach(f => register(f, q));
         const saturated = res.truncated || res.items.length >= 60;
         if (saturated && depth < SCAN_MAX_DEPTH && rectHalfDiagM(rect) > SCAN_MIN_HALF_M) {
             for (const quad of splitRect(rect)) {
                 if (state.cancel) break;
-                await scanQuery(q, quad, depth + 1, withNames, register);
+                await scanQuery(q, quad, depth + 1, register);
                 await sleep(30);
             }
         }
@@ -514,22 +643,20 @@
             progText.textContent = 'Připravuji oblast…';
             const geo = await resolveCenter();
             state.lastGeo = geo;
-            const withNames = document.getElementById('inp-names').checked;
             const area = computeArea(geo);
             drawPreview(geo, area, true);
 
             // ---- FÁZE 1: nalezení všech zápisů (adaptivní hloubka) ----
-            const queryList = document.getElementById('inp-deep').checked ? ALL_QUERIES.concat(EXTRA_QUERIES) : ALL_QUERIES;
+            const queryList = QUERY_SETS[document.getElementById('inp-country').value] || QUERY_SETS.cz;
             const queryHits = new Map();
             let added = 0, okCount = 0, failCount = 0, lastErr = null, qi = 0;
             const register = (f, q) => {
                 if (state.results.has(f.id)) {
                     const row = state.results.get(f.id);
                     if (!row.cats.includes(q)) row.cats.push(q);
-                    if (!row.name && f.name) row.name = f.name;
                 } else {
                     state.results.set(f.id, {
-                        id: f.id, name: f.name || null, cats: [q],
+                        id: f.id, cats: [q],
                         loc: null, accM: null, distM: null, inTown: null,
                         selected: false, area: geo.label,
                         center: { lat: geo.lat, lng: geo.lng }, townR: area.townR, circleR: area.circleR
@@ -543,7 +670,7 @@
                 if (state.cancel) break;
                 qi++;
                 progText.textContent = `Fáze 1/2 · hledání ${Math.round(qi / queryList.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
-                try { await scanQuery(q, area.rect, 0, withNames, register); okCount++; }
+                try { await scanQuery(q, area.rect, 0, register); okCount++; }
                 catch (e) {
                     failCount++; lastErr = e;
                     if (okCount === 0 && failCount >= 3) throw new Error('Hledání selhává – Places API vrací chybu: ' + (e.message || ''));
@@ -608,7 +735,7 @@
         for (const quad of splitRect(rect)) {
             if (!remaining.size || state.cancel) break;
             let found = [];
-            try { found = (await searchPlaces(q, quad, 2, false)).items.map(f => f.id).filter(id => remaining.has(id)); }
+            try { found = (await searchPlaces(q, quad, 2)).items.map(f => f.id).filter(id => remaining.has(id)); }
             catch (e) { continue; }
             if (!found.length) continue;
             found.forEach(id => remaining.delete(id));
@@ -706,8 +833,7 @@
                 fillColor: r.inTown === false ? '#f59e0b' : '#16a34a',
                 fillOpacity: 0.95
             });
-            const title = r.name ? esc(r.name) : ('Firemní zápis #' + (idx + 1));
-            m.bindPopup(`<strong>${title}</strong><br>${esc(r.cats.slice(0, 3).join(', '))}<br>≈ ${fmtKm(r.distM || 0)} km od středu · ±${r.accM} m<br><a href="${mapsLink(r.id)}" target="_blank" rel="noopener">otevřít zápis ↗</a>`);
+            m.bindPopup(`<strong>Firemní zápis #${idx + 1}</strong><br>${esc(r.cats.slice(0, 3).join(', '))}<br>≈ ${fmtKm(r.distM || 0)} km od středu · ±${r.accM} m<br><a href="${mapsLink(r.id)}" target="_blank" rel="noopener">otevřít zápis ↗</a>`);
             markerLayer.addLayer(m);
         });
     }
@@ -717,7 +843,7 @@
         const q = document.getElementById('flt-text').value.trim().toLowerCase();
         const onlyTown = document.getElementById('flt-town').checked;
         let rows = [...state.results.values()];
-        if (q) rows = rows.filter(r => ((r.name || '') + ' ' + (r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
+        if (q) rows = rows.filter(r => ((r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
         if (onlyTown) rows = rows.filter(r => r.inTown !== false);
         rows.sort((a, b) => ((a.distM == null ? 1e9 : a.distM) - (b.distM == null ? 1e9 : b.distM)) || a.cats[0].localeCompare(b.cats[0], 'cs'));
         return rows;
@@ -749,20 +875,19 @@
             let locTxt;
             if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu <span class="text-gray-300">· přesnost ±${r.accM} m</span>` + (r.inTown === false ? ' <span class="badge b-amber">mimo oblast</span>' : '');
             else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
-            const title = r.name
-                ? `<p class="text-sm text-gray-900 font-semibold leading-tight">${esc(r.name)}</p>`
-                : `<p class="text-sm text-gray-900 font-medium leading-tight">Firemní zápis <span class="text-gray-400 font-normal">· název a adresa na odkazu</span></p>`;
-
+            const saved = state.myLeads.get(r.id);
+            const savedBadge = saved ? `<span class="badge b-green"><i class="fa-solid fa-star"></i> ${saved.stars || '–'}/5 v seznamu</span> ` : '';
             return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
                 <td class="px-2 py-3">
-                    ${title}
-                    <p class="text-[11px] text-gray-400 mt-0.5">${locTxt}</p>
+                    <p class="text-sm text-gray-900 font-medium leading-tight">Firemní zápis <span class="text-gray-400 font-normal">· detaily v náhledu</span></p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">${savedBadge}${locTxt}</p>
                 </td>
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
-                    <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-solid fa-map-location-dot"></i> otevřít zápis</a>
+                    <button onclick="openProfile('${esc(r.id)}')" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-600 transition"><i class="fa-regular fa-eye"></i> zobrazit profil</button>
+                    <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" title="Otevřít v Google Mapách" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-500 hover:text-brand-600 hover:border-brand-500 transition ml-1"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
                 </td>
             </tr>`;
         }).join('');
@@ -776,9 +901,9 @@
         const sel = all.filter(r => r.selected);
         const rows = sel.length ? sel : all;
         if (!rows.length) { showToast('Není co exportovat.'); return; }
-        const head = ['Název', 'Nalezeno přes', 'Oblast', 'Vzdálenost od středu (km)', 'Souřadnice (přibližné)', 'Přesnost (m)', 'Odkaz na zápis'];
+        const head = ['Nalezeno přes', 'Oblast', 'Vzdálenost od středu (km)', 'Souřadnice (přibližné)', 'Přesnost (m)', 'Odkaz na zápis'];
         const line = r => [
-            r.name || '', r.cats.join(', '), r.area || '',
+            r.cats.join(', '), r.area || '',
             r.distM != null ? fmtKm(r.distM) : '',
             r.loc ? (r.loc.lat.toFixed(5) + ', ' + r.loc.lng.toFixed(5)) : '',
             r.accM != null ? r.accM : '',
@@ -792,6 +917,142 @@
         a.click();
         URL.revokeObjectURL(a.href);
         showToast('Exportováno ' + rows.length + ' zápisů' + (sel.length ? ' (jen vybrané)' : '') + '.');
+    }
+
+    // ===================== MŮJ SEZNAM LEADŮ =====================
+    function safeLoadLeads() {
+        try {
+            const s = localStorage.getItem('vlf-leads');
+            if (s) JSON.parse(s).forEach(l => state.myLeads.set(l.id, l));
+        } catch (e) { /* úložiště nedostupné – seznam poběží jen v paměti */ }
+    }
+    function persistLeads() {
+        try { localStorage.setItem('vlf-leads', JSON.stringify([...state.myLeads.values()])); } catch (e) {}
+    }
+    function scrollToMyList() {
+        if (!state.myLeads.size) { showToast('Seznam je zatím prázdný – přidejte lead přes „zobrazit profil".'); return; }
+        document.getElementById('mylist-card').scrollIntoView({ behavior: 'smooth' });
+    }
+    function starsHtml(n) {
+        let s = '';
+        for (let i = 1; i <= 5; i++) s += `<i class="fa-solid fa-star ${i <= n ? 'text-amber-400' : 'text-gray-200'} text-xs"></i>`;
+        return s;
+    }
+    function renderMyList() {
+        const leads = [...state.myLeads.values()].sort((a, b) => (b.stars || 0) - (a.stars || 0) || (b.savedAt || 0) - (a.savedAt || 0));
+        document.getElementById('nav-mylist-count').textContent = leads.length;
+        document.getElementById('mylist-count').textContent = leads.length;
+        document.getElementById('mylist-card').classList.toggle('hidden', leads.length === 0);
+        document.getElementById('mylist-body').innerHTML = leads.map(l => `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
+            <td class="px-4 py-3">
+                <div class="flex items-center gap-1 mb-0.5">${starsHtml(l.stars || 0)}</div>
+                <p class="text-[11px] text-gray-400">${esc(l.area || '')}${l.distM != null ? ' · ≈ ' + fmtKm(l.distM) + ' km' : ''}</p>
+                <p class="text-[11px] text-gray-400">${esc((l.cats || []).slice(0, 3).join(', '))}</p>
+            </td>
+            <td class="px-2 py-3 text-sm text-gray-800">${esc(l.person || '') || '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-2 py-3 text-sm whitespace-nowrap">${l.phone ? '<a href="tel:' + esc(String(l.phone).replace(/\s/g, '')) + '" class="text-gray-800 hover:text-brand-600 font-medium">' + esc(l.phone) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-2 py-3 text-sm">${l.email ? '<a href="mailto:' + esc(l.email) + '" class="text-brand-600 hover:underline break-all">' + esc(l.email) + '</a>' : '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-2 py-3 text-xs text-gray-500 max-w-[220px]">${esc(l.note || '') || '<span class="text-gray-300">–</span>'}</td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button onclick="openProfile('${esc(l.id)}')" class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-regular fa-pen-to-square"></i> upravit</button>
+                <button onclick="deleteLead('${esc(l.id)}')" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-300 transition ml-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            </td>
+        </tr>`).join('');
+    }
+    function deleteLead(id) {
+        if (!confirm('Odebrat tento lead ze seznamu?')) return;
+        state.myLeads.delete(id);
+        persistLeads();
+        renderMyList();
+        renderTable();
+        showToast('Lead odebrán.');
+    }
+    function exportXlsx() {
+        const leads = [...state.myLeads.values()].sort((a, b) => (b.stars || 0) - (a.stars || 0));
+        if (!leads.length) { showToast('Seznam je prázdný.'); return; }
+        const rows = leads.map(l => ({
+            'Hvězdy (1–5)': l.stars || '',
+            'Kontaktní osoba': l.person || '',
+            'Telefon': l.phone || '',
+            'E-mail': l.email || '',
+            'Poznámka': l.note || '',
+            'Oblast': l.area || '',
+            'Vzdálenost od středu (km)': l.distM != null ? Number((l.distM / 1000).toFixed(1)) : '',
+            'Nalezeno přes': (l.cats || []).join(', '),
+            'Odkaz na zápis': mapsLink(l.id),
+            'Uloženo': l.savedAt ? new Date(l.savedAt).toLocaleDateString('cs-CZ') : ''
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{wch:10},{wch:20},{wch:16},{wch:26},{wch:40},{wch:28},{wch:12},{wch:30},{wch:55},{wch:12}];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Moje leady');
+        XLSX.writeFile(wb, 'moje-leady-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        showToast('Exportováno ' + leads.length + ' leadů do XLS.');
+    }
+
+    // ===================== MODAL: NÁHLED PROFILU =====================
+    function openProfile(id) {
+        state.modalId = id;
+        const lead = state.myLeads.get(id);
+        const iframe = document.getElementById('modal-iframe');
+        iframe.src = 'https://www.google.com/maps/embed/v1/place?key=' + EFFECTIVE_API_KEY
+            + '&q=place_id:' + encodeURIComponent(id)
+            + '&language=' + COUNTRY_META[document.getElementById('inp-country').value].lang;
+        document.getElementById('modal-maps-link').href = mapsLink(id);
+        document.getElementById('modal-person').value = lead ? (lead.person || '') : '';
+        document.getElementById('modal-phone').value = lead ? (lead.phone || '') : '';
+        document.getElementById('modal-email').value = lead ? (lead.email || '') : '';
+        document.getElementById('modal-note').value = lead ? (lead.note || '') : '';
+        state.modalStars = lead ? (lead.stars || 0) : 0;
+        renderModalStars();
+        document.getElementById('modal-remove').classList.toggle('hidden', !lead);
+        document.getElementById('profile-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeProfile() {
+        document.getElementById('profile-modal').classList.add('hidden');
+        document.getElementById('modal-iframe').src = 'about:blank';
+        document.body.style.overflow = '';
+        state.modalId = null;
+    }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.modalId) closeProfile(); });
+    function renderModalStars() {
+        document.getElementById('modal-stars').innerHTML = [1, 2, 3, 4, 5].map(i =>
+            `<button type="button" onclick="setStars(${i})" class="text-lg leading-none ${i <= state.modalStars ? 'text-amber-400' : 'text-gray-200'} hover:text-amber-300 transition"><i class="fa-solid fa-star"></i></button>`
+        ).join('');
+    }
+    function setStars(n) { state.modalStars = (state.modalStars === n) ? 0 : n; renderModalStars(); }
+    function saveLead() {
+        const id = state.modalId;
+        if (!id) return;
+        const row = state.results.get(id);
+        const prev = state.myLeads.get(id);
+        state.myLeads.set(id, {
+            id,
+            person: document.getElementById('modal-person').value.trim(),
+            phone: document.getElementById('modal-phone').value.trim(),
+            email: document.getElementById('modal-email').value.trim(),
+            note: document.getElementById('modal-note').value.trim(),
+            stars: state.modalStars,
+            area: row ? row.area : (prev ? prev.area : ''),
+            distM: row ? row.distM : (prev ? prev.distM : null),
+            cats: row ? row.cats : (prev ? prev.cats : []),
+            savedAt: prev ? prev.savedAt : Date.now()
+        });
+        persistLeads();
+        renderMyList();
+        renderTable();
+        closeProfile();
+        showToast('Lead uložen do seznamu.');
+    }
+    function removeLead() {
+        if (!state.modalId) return;
+        state.myLeads.delete(state.modalId);
+        persistLeads();
+        renderMyList();
+        renderTable();
+        closeProfile();
+        showToast('Lead odebrán ze seznamu.');
     }
 
     // ===================== DIAGNOSTIKA =====================
@@ -840,7 +1101,14 @@
     })();
 
     // ===================== INIT =====================
-    document.getElementById('extra-count').textContent = EXTRA_QUERIES.length;
+    function onCountryChange() {
+        state.lastGeo = null;
+        document.getElementById('query-count').textContent = (QUERY_SETS[document.getElementById('inp-country').value] || QUERY_SETS.cz).length;
+    }
+    document.getElementById('inp-country').addEventListener('change', onCountryChange);
+    onCountryChange();
+    safeLoadLeads();
+    renderMyList();
     ensureMap();
     </script>
 </body>
