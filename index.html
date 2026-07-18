@@ -149,6 +149,7 @@
                             <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                             <input id="flt-text" type="text" placeholder="filtrovat…" oninput="renderTable()" class="pl-8 p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-40">
                         </div>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zadaná obec</label>
                         <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-notour" onchange="renderTable()"> jen bez virtuálky</label>
                         <span class="flex-1"></span>
                         <button onclick="loadAddressesForFiltered()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Doplní adresu a souřadnice (nutné pro ověření virtuálek). Zdarma do 10 000 firem měsíčně.">
@@ -287,15 +288,17 @@
                 if (status !== 'OK' || !results || !results.length) { reject(new Error('Obec „' + query + '" se nepodařilo najít. Zkuste přidat okres, např. „Jestřabí Lhota, okres Kolín".')); return; }
                 const res = results[0];
                 const loc = { lat: res.geometry.location.lat(), lng: res.geometry.location.lng() };
-                let radius = 2500;
+                let radius = 2500, bounds = null;
                 const b = res.geometry.bounds || res.geometry.viewport;
                 if (b) {
                     const ne = b.getNorthEast(), sw = b.getSouthWest();
+                    bounds = { low: { latitude: sw.lat(), longitude: sw.lng() }, high: { latitude: ne.lat(), longitude: ne.lng() } };
                     const dLat = Math.abs(ne.lat() - sw.lat()) * 111320 / 2;
                     const dLng = Math.abs(ne.lng() - sw.lng()) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
                     radius = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
                 }
-                const out = { lat: loc.lat, lng: loc.lng, radius, label: res.formatted_address };
+                const locComp = (res.address_components || []).find(c => c.types.includes('locality') || c.types.includes('sublocality') || c.types.includes('administrative_area_level_3'));
+                const out = { lat: loc.lat, lng: loc.lng, radius, bounds, label: res.formatted_address, locality: locComp ? locComp.long_name : query };
                 state.geoCache.set(key, out);
                 resolve(out);
             });
@@ -373,18 +376,13 @@
     // ===================== HLEDÁNÍ (Places API New – Text Search, ID-only = zdarma bez limitu) =====================
     const SEARCH_FIELDS_FREE = 'places.id,nextPageToken';
 
-    async function textSearch(query, geo, radius, pageToken) {
-        // locationRestriction = tvrdé ohraničení oblasti (bias byl jen "doporučení" a u malých obcí Google vracel výsledky odjinud)
-        const dLat = radius / 111320;
-        const dLng = radius / (111320 * Math.cos(geo.lat * Math.PI / 180));
+    async function textSearch(query, rect, pageToken) {
+        // locationRestriction = tvrdé ohraničení oblasti; v režimu Auto se použijí přesné hranice obce z geokódování
         const body = {
             textQuery: query,
             pageSize: 20,
             languageCode: 'cs',
-            locationRestriction: { rectangle: {
-                low:  { latitude: geo.lat - dLat, longitude: geo.lng - dLng },
-                high: { latitude: geo.lat + dLat, longitude: geo.lng + dLng }
-            } }
+            locationRestriction: { rectangle: rect }
         };
         if (pageToken) body.pageToken = pageToken;
         const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
@@ -419,7 +417,18 @@
             progText.textContent = 'Hledám obec „' + place + '"…';
             const geo = await geocodePlace(place);
             const radiusSel = document.getElementById('inp-radius').value;
-            const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
+            let rect;
+            if (radiusSel === 'auto' && geo.bounds) {
+                rect = geo.bounds; // přesné hranice obce
+            } else {
+                const radius = radiusSel === 'auto' ? geo.radius : parseInt(radiusSel, 10);
+                const dLat = radius / 111320;
+                const dLng = radius / (111320 * Math.cos(geo.lat * Math.PI / 180));
+                rect = {
+                    low:  { latitude: geo.lat - dLat, longitude: geo.lng - dLng },
+                    high: { latitude: geo.lat + dLat, longitude: geo.lng + dLng }
+                };
+            }
             let added = 0, i = 0, okCount = 0, failCount = 0, lastErr = null;
             for (const cat of ALL_QUERIES) {
                 i++;
@@ -428,7 +437,7 @@
                 do {
                     page++;
                     let data;
-                    try { data = await textSearch(cat, geo, radius, token); okCount++; }
+                    try { data = await textSearch(cat, rect, token); okCount++; }
                     catch (e) {
                         console.warn('Search failed for', cat, e);
                         failCount++; lastErr = e;
@@ -449,7 +458,7 @@
                             cats: [cat],
                             tour: null, tourAuthor: null,
                             selected: false, addrLoading: false,
-                            area: geo.label
+                            area: geo.label, homeTown: geo.locality || '', inTown: null
                         });
                         added++;
                     });
@@ -488,6 +497,7 @@
             const d = await r.json();
             row.address = d.formattedAddress || '–';
             if (d.location) { row.lat = d.location.latitude; row.lng = d.location.longitude; }
+            row.inTown = townMatch(row.address, row.homeTown);
         } catch (e) {
             console.warn('Address load failed', e);
         } finally {
@@ -556,12 +566,19 @@
     }
 
     // ===================== TABULKA =====================
+    function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+    function townMatch(addr, town) {
+        if (!addr || !town) return null;
+        return norm(addr).includes(norm(town));
+    }
     function filteredRows() {
         const q = document.getElementById('flt-text').value.trim().toLowerCase();
         const noTour = document.getElementById('flt-notour').checked;
+        const onlyTown = document.getElementById('flt-town').checked;
         let rows = [...state.results.values()];
         if (q) rows = rows.filter(r => (r.address + ' ' + (r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
         if (noTour) rows = rows.filter(r => r.tour === 'no');
+        if (onlyTown) rows = rows.filter(r => r.inTown !== false); // firmy s adresou mimo obec skryjeme, nedoplněné necháme
         rows.sort((a, b) => (a.cats[0] + a.address).localeCompare(b.cats[0] + b.address, 'cs'));
         return rows;
     }
@@ -600,7 +617,7 @@
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
                 <td class="px-2 py-3">
-                    <p class="text-sm ${r.address ? 'text-gray-900 font-medium' : 'text-gray-400 italic'} leading-tight">${r.addrLoading ? '<i class="fa-solid fa-circle-notch spin text-gray-300"></i>' : (r.address ? esc(r.address) : 'adresa nedoplněna – detaily na odkazu')}</p>
+                    <p class="text-sm ${r.address ? 'text-gray-900 font-medium' : 'text-gray-400 italic'} leading-tight">${r.addrLoading ? '<i class="fa-solid fa-circle-notch spin text-gray-300"></i>' : (r.address ? esc(r.address) : 'adresa nedoplněna – detaily na odkazu')}${r.inTown === false ? ' <span class="badge b-amber">mimo obec</span>' : ''}</p>
                     <p class="text-[11px] text-gray-400 mt-0.5">${esc(r.area || '')}</p>
                 </td>
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
