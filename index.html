@@ -7,6 +7,8 @@
     <title>View Lead Finder | Vyhledávání firemních zápisů</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = { theme: { extend: {
@@ -31,6 +33,9 @@
         #place-suggest button { display:block; width:100%; text-align:left; padding:9px 14px; font-size:13.5px; color:#374151; }
         #place-suggest button:hover, #place-suggest button.active { background:#f0fdf4; color:#166534; }
         #place-suggest .sug-sec { color:#9ca3af; font-size:11.5px; }
+        #map { height: 400px; z-index: 1; }
+        .leaflet-popup-content { font-family:'Inter',sans-serif; font-size:12.5px; margin:10px 14px; }
+        .leaflet-popup-content a { color:#15803d; font-weight:700; }
     </style>
 </head>
 <body class="font-sans text-gray-900 h-screen flex overflow-hidden antialiased">
@@ -55,11 +60,11 @@
             <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-6">Spotřeba (relace)</p>
             <div class="mx-3 card-minimal !shadow-none p-3 text-xs text-gray-600 space-y-1.5">
                 <div class="flex justify-between"><span>Hledání <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-free" class="text-gray-900">0</strong></div>
-                <div class="flex justify-between"><span>Virtuálky <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-sv" class="text-gray-900">0</strong></div>
+                <div class="flex justify-between"><span>Hledání s názvy <span class="text-gray-400">(5 000/měs.)</span></span><strong id="cnt-named" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Geokódování <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Našeptávač <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-ac" class="text-gray-900">0</strong></div>
             </div>
-            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy i ověření virtuálek jsou zdarma bez limitu. Jediné limitované (zdarma do 10 000/měs.) je geokódování obce (1 na hledání) a našeptávač.</p>
+            <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání, určení polohy i mapa jsou zdarma bez limitu. Limit (společný pro celý tým) čerpá jen volitelné načtení názvů, geokódování obce a našeptávač.</p>
         </nav>
         <div class="p-4 border-t border-border bg-gray-50">
             <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">View Lead Finder</p>
@@ -131,13 +136,29 @@
                         </button>
                     </div>
 
-                    <div class="mt-5 pt-4 border-t border-gray-100 flex items-start gap-2.5">
+                    <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+                        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="Názvy firem nejsou v neomezené bezplatné úrovni. Zaškrtnutím se hledání účtuje do společného limitu 5 000 dotazů měsíčně pro celý tým.">
+                            <input type="checkbox" id="inp-names"> Načíst i názvy firem <span class="badge b-amber">čerpá limit 5 000/měs.</span>
+                        </label>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex items-start gap-2.5">
                         <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 text-sm"><i class="fa-solid fa-layer-group"></i></div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Aplikace automaticky projede <strong class="text-gray-700">celou sadu oborů a obecných výrazů</strong> (<span id="query-count">–</span> dotazů) a poté <strong class="text-gray-700">mřížkovým zpřesňováním určí polohu každé firmy</strong> — díky tomu funguje filtr obce i ověření virtuálek úplně zdarma a bez limitu. U větších obcí zabere sken několik minut; průběžné výsledky se zobrazují hned.</p>
+                        <p class="text-xs text-gray-500 leading-relaxed">Aplikace projede <strong class="text-gray-700">celou sadu oborů a obecných výrazů</strong> (<span id="query-count">–</span> dotazů) a mřížkovým zpřesňováním určí polohu každé firmy — vše zdarma a bez limitu. Výsledky se ukazují průběžně na mapě i v tabulce. U větších obcí zabere sken několik minut.</p>
                     </div>
                     <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2">
                         <i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span>
                         <button onclick="cancelSearch()" class="text-red-500 font-semibold hover:underline ml-2">zastavit</button>
+                    </div>
+                </div>
+
+                <!-- MAP -->
+                <div id="map-card" class="hidden card-minimal overflow-hidden">
+                    <div id="map"></div>
+                    <div class="px-5 py-2.5 border-t border-gray-100 flex items-center gap-4 text-[11px] text-gray-500">
+                        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#16a34a"></span> firemní zápis v obci</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#f59e0b"></span> mimo zadanou obec</span>
+                        <span class="text-gray-400">· poloha je přibližná (mřížkové určení) · mapa © OpenStreetMap</span>
                     </div>
                 </div>
 
@@ -149,11 +170,7 @@
                             <input id="flt-text" type="text" placeholder="filtrovat…" oninput="renderTable()" class="pl-8 p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-40">
                         </div>
                         <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zadaná obec <span id="flt-town-note" class="text-gray-400 font-normal"></span></label>
-                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-notour" onchange="renderTable()"> jen bez virtuálky</label>
                         <span class="flex-1"></span>
-                        <button onclick="checkAllTours()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Zjistí přes Street View metadata (zdarma bez limitu), zda je u firmy nahrané panorama / prohlídka.">
-                            <i class="fa-solid fa-street-view"></i> Ověřit virtuálky <span class="badge b-green">zdarma</span>
-                        </button>
                         <button onclick="exportCsv()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
                         </button>
@@ -162,14 +179,13 @@
                         </button>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm min-w-[820px]">
+                        <table class="w-full text-sm min-w-[760px]">
                             <thead>
                                 <tr class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                                     <th class="px-4 py-3 w-8"><input type="checkbox" id="chk-all" onchange="toggleAll(this.checked)"></th>
                                     <th class="px-2 py-3 w-10">#</th>
                                     <th class="px-2 py-3">Firemní zápis · poloha</th>
                                     <th class="px-2 py-3">Nalezeno přes</th>
-                                    <th class="px-2 py-3">Virtuálka</th>
                                     <th class="px-4 py-3 text-right">Odkaz na zápis</th>
                                 </tr>
                             </thead>
@@ -183,7 +199,7 @@
                 <div id="empty-state" class="card-minimal p-10 text-center">
                     <div class="w-14 h-14 mx-auto rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-map-location-dot"></i></div>
                     <h2 class="font-bold text-gray-900 mb-1.5">Najděte firemní zápisy v oblasti</h2>
-                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec a získáte seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu, pro celý tým. Aplikace určí polohu firem, ověří virtuálky a vyfiltruje ty, které virtuálku nemají. Telefon, web a adresu obchodník uvidí po kliknutí na zápis.</p>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">Zadejte obec a získáte mapu a seznam odkazů na firemní zápisy na Googlu — zdarma a bez limitu, pro celý tým. Název, adresu, telefon a web obchodník uvidí po kliknutí na zápis.</p>
                 </div>
 
             </div>
@@ -227,7 +243,7 @@
     const state = {
         results: new Map(),      // placeId -> row
         geoCache: new Map(),
-        counters: { free: 0, sv: 0, geo: 0, ac: 0 },
+        counters: { free: 0, named: 0, geo: 0, ac: 0 },
         busy: false,
         cancel: false
     };
@@ -258,7 +274,7 @@
     function bumpCounter(key) {
         state.counters[key]++;
         document.getElementById('cnt-free').textContent = state.counters.free;
-        document.getElementById('cnt-sv').textContent = state.counters.sv;
+        document.getElementById('cnt-named').textContent = state.counters.named;
         document.getElementById('cnt-geo').textContent = state.counters.geo;
         document.getElementById('cnt-ac').textContent = state.counters.ac;
     }
@@ -344,13 +360,13 @@
         if (!s) return;
         document.getElementById('inp-place').value = s.full;
         hideSuggest();
-        runSearch();
+        // hledání se záměrně nespouští automaticky – obchodník klikne na Vyhledat
     }
     function onPlaceKey(e) {
         if (!sugItems.length) { if (e.key === 'Enter') runSearch(); return; }
         if (e.key === 'ArrowDown') { e.preventDefault(); sugActive = (sugActive + 1) % sugItems.length; renderSuggest(); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); sugActive = (sugActive - 1 + sugItems.length) % sugItems.length; renderSuggest(); }
-        else if (e.key === 'Enter') { e.preventDefault(); sugActive >= 0 ? pickSuggest(sugActive) : (hideSuggest(), runSearch()); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (sugActive >= 0) pickSuggest(sugActive); else hideSuggest(); }
         else if (e.key === 'Escape') hideSuggest();
     }
 
@@ -372,7 +388,7 @@
                     bounds = { low: { latitude: sw.lat(), longitude: sw.lng() }, high: { latitude: ne.lat(), longitude: ne.lng() } };
                     const dLat = Math.abs(ne.lat() - sw.lat()) * 111320 / 2;
                     const dLng = Math.abs(ne.lng() - sw.lng()) * 111320 * Math.cos(loc.lat * Math.PI / 180) / 2;
-                    rIn = Math.max(500, Math.round(Math.min(dLat, dLng)));      // vepsaný okruh – pro filtr "jen zadaná obec"
+                    rIn = Math.max(500, Math.round(Math.min(dLat, dLng)));
                     rOut = Math.min(25000, Math.max(1200, Math.round(Math.sqrt(dLat * dLat + dLng * dLng))));
                 }
                 const out = { lat: loc.lat, lng: loc.lng, bounds, rIn, rOut, label: res.formatted_address };
@@ -382,9 +398,10 @@
         }));
     }
 
-    // ===================== ID-ONLY HLEDÁNÍ (zdarma bez limitu) =====================
-    async function searchIds(query, rect, maxPages) {
-        const ids = [];
+    // ===================== HLEDÁNÍ (Places API New – Text Search) =====================
+    // ID-only = zdarma bez limitu; s názvy = Pro úroveň (5 000/měs. zdarma na projekt)
+    async function searchPlaces(query, rect, maxPages, withNames) {
+        const out = [];
         let token = null, page = 0;
         do {
             page++;
@@ -392,10 +409,14 @@
             if (token) body.pageToken = token;
             const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY, 'X-Goog-FieldMask': 'places.id,nextPageToken' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': EFFECTIVE_API_KEY,
+                    'X-Goog-FieldMask': withNames ? 'places.id,places.displayName,nextPageToken' : 'places.id,nextPageToken'
+                },
                 body: JSON.stringify(body)
             });
-            bumpCounter('free');
+            bumpCounter(withNames ? 'named' : 'free');
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
                 const msg = (err.error && err.error.message) || ('HTTP ' + r.status);
@@ -403,10 +424,10 @@
                 throw new Error(msg);
             }
             const j = await r.json();
-            (j.places || []).forEach(p => { if (p.id) ids.push(p.id); });
+            (j.places || []).forEach(p => { if (p.id) out.push({ id: p.id, name: (p.displayName && p.displayName.text) || null }); });
             token = j.nextPageToken || null;
         } while (token && page < maxPages);
-        return ids;
+        return out;
     }
 
     // ===================== HLAVNÍ SKEN =====================
@@ -417,6 +438,7 @@
         const place = document.getElementById('inp-place').value.trim();
         if (!place) { showToast('Zadejte obec nebo město.'); return; }
         const maxPages = parseInt(document.getElementById('inp-pages').value, 10);
+        const withNames = document.getElementById('inp-names').checked;
         state.busy = true; state.cancel = false;
         setSearchBusy(true);
         const prog = document.getElementById('search-progress'), progText = document.getElementById('search-progress-text');
@@ -432,47 +454,50 @@
                 rect0 = rectFromRadius(geo.lat, geo.lng, radius);
                 townR = radius;
             }
+            fitMapTo(rect0);
 
             // ---- FÁZE 1: nalezení všech zápisů v oblasti ----
-            const queryHits = new Map(); // query -> Set(id) nově nalezených touto relací
+            const queryHits = new Map();
             let added = 0, okCount = 0, failCount = 0, lastErr = null, qi = 0;
             for (const q of ALL_QUERIES) {
                 if (state.cancel) break;
                 qi++;
-                progText.textContent = `Fáze 1/3 · hledání ${Math.round(qi / ALL_QUERIES.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
-                let ids = [];
-                try { ids = await searchIds(q, rect0, maxPages); okCount++; }
+                progText.textContent = `Fáze 1/2 · hledání ${Math.round(qi / ALL_QUERIES.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
+                let found = [];
+                try { found = await searchPlaces(q, rect0, maxPages, withNames); okCount++; }
                 catch (e) {
                     failCount++; lastErr = e;
                     if (okCount === 0 && failCount >= 3) throw new Error('Hledání selhává – Places API vrací chybu: ' + (e.message || ''));
                     continue;
                 }
-                ids.forEach(id => {
-                    if (state.results.has(id)) {
-                        const row = state.results.get(id);
+                found.forEach(f => {
+                    if (state.results.has(f.id)) {
+                        const row = state.results.get(f.id);
                         if (!row.cats.includes(q)) row.cats.push(q);
+                        if (!row.name && f.name) row.name = f.name;
                     } else {
-                        state.results.set(id, {
-                            id, cats: [q], loc: null, accM: null, distM: null, inTown: null,
-                            tour: null, tourAuthor: null, selected: false,
-                            area: geo.label, center: { lat: geo.lat, lng: geo.lng }, townR
+                        state.results.set(f.id, {
+                            id: f.id, name: f.name || null, cats: [q],
+                            loc: null, accM: null, distM: null, inTown: null,
+                            selected: false, area: geo.label,
+                            center: { lat: geo.lat, lng: geo.lng }, townR
                         });
                         added++;
                     }
                     if (!queryHits.has(q)) queryHits.set(q, new Set());
-                    queryHits.get(q).add(id);
+                    queryHits.get(q).add(f.id);
                 });
                 if (qi % 10 === 0) renderTable();
                 await sleep(40);
             }
             renderTable();
 
-            // ---- FÁZE 2: mřížkové určení polohy (zdarma) ----
+            // ---- FÁZE 2: mřížkové určení polohy (vždy ID-only, zdarma) ----
             if (!state.cancel) {
                 const toLocate = new Set([...state.results.values()].filter(r => !r.loc).map(r => r.id));
                 let located = 0;
                 const totalToLocate = toLocate.size;
-                const updateP2 = () => { progText.textContent = `Fáze 2/3 · určuji polohu ${located}/${totalToLocate} firem…`; };
+                const updateP2 = () => { progText.textContent = `Fáze 2/2 · určuji polohu ${located}/${totalToLocate} firem…`; };
                 updateP2();
                 for (const [q, idSet] of queryHits) {
                     if (state.cancel) break;
@@ -482,20 +507,11 @@
                         if (toLocate.delete(id)) { located++; updateP2(); }
                     });
                 }
-                // dopočítat vzdálenosti a příslušnost k obci
                 state.results.forEach(r => {
                     if (r.loc) {
                         r.distM = Math.round(distMeters(r.center.lat, r.center.lng, r.loc.lat, r.loc.lng));
                         r.inTown = r.distM <= (r.townR + (r.accM || 0));
                     }
-                });
-                renderTable();
-            }
-
-            // ---- FÁZE 3: virtuálky (zdarma) ----
-            if (!state.cancel) {
-                await checkToursCore([...state.results.values()].filter(r => r.tour === null && r.loc), (d, t) => {
-                    progText.textContent = `Fáze 3/3 · ověřuji virtuálky ${d}/${t}…`;
                 });
                 renderTable();
             }
@@ -515,9 +531,8 @@
         }
     }
 
-    // Rekurzivní zpřesnění polohy: dotaz q se pouští v podčtvercích; tvrdé ohraničení zaručí,
-    // že se zápis objeví jen ve čtverci, kde firma skutečně je.
-    const LOCATE_TARGET_M = 90;   // cílová přesnost (poloviční úhlopříčka čtverce)
+    // Rekurzivní zpřesnění polohy: tvrdé ohraničení zaručí, že se zápis objeví jen ve čtverci, kde firma skutečně je.
+    const LOCATE_TARGET_M = 90;
     const LOCATE_MAX_DEPTH = 5;
     async function localizeQuery(q, rect, targetIds, depth, onLocated) {
         if (!targetIds.size || state.cancel) return;
@@ -530,9 +545,9 @@
         const remaining = new Set(targetIds);
         for (const quad of splitRect(rect)) {
             if (!remaining.size || state.cancel) break;
-            let ids = [];
-            try { ids = await searchIds(q, quad, 2); } catch (e) { continue; }
-            const found = ids.filter(id => remaining.has(id));
+            let found = [];
+            try { found = (await searchPlaces(q, quad, 2, false)).map(f => f.id).filter(id => remaining.has(id)); }
+            catch (e) { continue; }
             if (!found.length) continue;
             found.forEach(id => remaining.delete(id));
             const c = rectCenter(quad), h = Math.round(rectHalfDiagM(quad));
@@ -543,7 +558,6 @@
             }
             await sleep(30);
         }
-        // nedohledané (např. přetečení stránkování) – přiřadit střed aktuálního čtverce jako hrubou polohu
         const c0 = rectCenter(rect);
         remaining.forEach(id => setLoc(id, c0, Math.round(half), onLocated));
     }
@@ -561,59 +575,50 @@
         document.getElementById('btn-search-label').textContent = b ? 'Hledám…' : 'Vyhledat';
     }
 
-    // ===================== VIRTUÁLKY (Street View metadata – zdarma bez limitu) =====================
-    let svService = null;
-    function getSv() {
-        if (!svService && window.google && google.maps) svService = new google.maps.StreetViewService();
-        return svService;
+    // ===================== MAPA (Leaflet + OpenStreetMap – zdarma, mimo Google rozpočet) =====================
+    let map = null, markerLayer = null;
+    function ensureMap() {
+        if (map) return;
+        map = L.map('map', { scrollWheelZoom: true }).setView([49.95, 15.2], 8);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        markerLayer = L.layerGroup().addTo(map);
     }
-    function checkTour(row) {
-        return new Promise(resolve => {
-            const sv = getSv();
-            if (!sv || !row.loc) { row.tour = 'unknown'; resolve(); return; }
-            const radius = Math.min(120, Math.max(35, row.accM || 60));
-            sv.getPanorama({ location: { lat: row.loc.lat, lng: row.loc.lng }, radius, preference: 'nearest', sources: ['default'] }, (data, status) => {
-                bumpCounter('sv');
-                if (status === 'OK' && data && data.copyright) {
-                    row.tour = /google/i.test(data.copyright) ? 'no' : 'yes';
-                    row.tourAuthor = /google/i.test(data.copyright) ? null : data.copyright.replace(/^©\s*\d*\s*/, '');
-                } else {
-                    row.tour = 'no';
-                }
-                resolve();
+    function fitMapTo(rect) {
+        document.getElementById('map-card').classList.remove('hidden');
+        ensureMap();
+        setTimeout(() => {
+            map.invalidateSize();
+            map.fitBounds([[rect.low.latitude, rect.low.longitude], [rect.high.latitude, rect.high.longitude]], { padding: [20, 20] });
+        }, 50);
+    }
+    function renderMap(rows) {
+        if (!rows.some(r => r.loc) && !map) return;
+        document.getElementById('map-card').classList.remove('hidden');
+        ensureMap();
+        markerLayer.clearLayers();
+        rows.forEach((r, idx) => {
+            if (!r.loc) return;
+            const m = L.circleMarker([r.loc.lat, r.loc.lng], {
+                radius: 7,
+                color: '#ffffff', weight: 2,
+                fillColor: r.inTown === false ? '#f59e0b' : '#16a34a',
+                fillOpacity: 0.95
             });
+            const title = r.name ? esc(r.name) : ('Firemní zápis #' + (idx + 1));
+            m.bindPopup(`<strong>${title}</strong><br>${esc(r.cats.slice(0, 3).join(', '))}<br>≈ ${fmtKm(r.distM || 0)} km od středu · ±${r.accM} m<br><a href="${mapsLink(r.id)}" target="_blank" rel="noopener">otevřít zápis ↗</a>`);
+            markerLayer.addLayer(m);
         });
-    }
-    async function checkToursCore(pending, progressCb) {
-        for (let i = 0; i < pending.length; i++) {
-            if (state.cancel) break;
-            await checkTour(pending[i]);
-            if ((i + 1) % 10 === 0) { renderTable(); if (progressCb) progressCb(i + 1, pending.length); }
-            await sleep(70);
-        }
-    }
-    async function checkAllTours() {
-        if (state.busy) return;
-        const visible = filteredRows();
-        const pending = visible.filter(r => r.tour === null && r.loc);
-        if (!pending.length) { showToast('Virtuálky u zobrazených zápisů už jsou ověřené.'); return; }
-        state.busy = true;
-        showToast('Ověřuji virtuálky u ' + pending.length + ' zápisů…');
-        await checkToursCore(pending);
-        state.busy = false;
-        renderTable();
-        const withTour = pending.filter(r => r.tour === 'yes').length;
-        showToast('Hotovo – panorama/prohlídku má ' + withTour + ' z ' + pending.length + ' ověřených zápisů.');
     }
 
     // ===================== TABULKA =====================
     function filteredRows() {
         const q = document.getElementById('flt-text').value.trim().toLowerCase();
-        const noTour = document.getElementById('flt-notour').checked;
         const onlyTown = document.getElementById('flt-town').checked;
         let rows = [...state.results.values()];
-        if (q) rows = rows.filter(r => ((r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
-        if (noTour) rows = rows.filter(r => r.tour === 'no');
+        if (q) rows = rows.filter(r => ((r.name || '') + ' ' + (r.area || '') + ' ' + r.cats.join(' ')).toLowerCase().includes(q));
         if (onlyTown) rows = rows.filter(r => r.inTown !== false);
         rows.sort((a, b) => ((a.distM == null ? 1e9 : a.distM) - (b.distM == null ? 1e9 : b.distM)) || a.cats[0].localeCompare(b.cats[0], 'cs'));
         return rows;
@@ -625,6 +630,7 @@
         if (!confirm('Vymazat všech ' + state.results.size + ' výsledků?')) return;
         state.results.clear();
         renderTable();
+        if (markerLayer) markerLayer.clearLayers();
         showToast('Seznam vymazán.');
     }
     function mapsLink(id) { return 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(id); }
@@ -633,6 +639,7 @@
         const rows = filteredRows();
         document.getElementById('empty-state').classList.toggle('hidden', state.results.size > 0);
         document.getElementById('results-wrap').classList.toggle('hidden', state.results.size === 0);
+        if (state.results.size === 0) document.getElementById('map-card').classList.add('hidden');
         const hc = document.getElementById('header-count');
         hc.classList.toggle('hidden', state.results.size === 0);
         hc.classList.toggle('flex', state.results.size > 0);
@@ -642,30 +649,28 @@
         document.getElementById('results-empty').classList.toggle('hidden', rows.length > 0 || state.results.size === 0);
 
         document.getElementById('results-body').innerHTML = rows.map((r, idx) => {
-            let tour;
-            if (r.tour === 'no') tour = '<span class="badge b-green"><i class="fa-solid fa-street-view"></i> bez virtuálky</span>';
-            else if (r.tour === 'yes') tour = '<span class="badge b-gray" title="' + esc(r.tourAuthor || '') + '"><i class="fa-solid fa-street-view"></i> má panorama</span>';
-            else if (r.tour === 'unknown') tour = '<span class="badge b-amber">nelze ověřit</span>';
-            else tour = '<span class="text-gray-300 text-xs">neověřeno</span>';
-
             let locTxt;
             if (r.loc) locTxt = `≈ ${fmtKm(r.distM)} km od středu obce <span class="text-gray-300">· přesnost ±${r.accM} m</span>` + (r.inTown === false ? ' <span class="badge b-amber">mimo obec</span>' : '');
             else locTxt = '<span class="text-gray-300"><i class="fa-solid fa-circle-notch spin mr-1"></i>poloha se určuje…</span>';
+            const title = r.name
+                ? `<p class="text-sm text-gray-900 font-semibold leading-tight">${esc(r.name)}</p>`
+                : `<p class="text-sm text-gray-900 font-medium leading-tight">Firemní zápis <span class="text-gray-400 font-normal">· název a adresa na odkazu</span></p>`;
 
             return `<tr class="border-b border-gray-50 hover:bg-gray-50/60 transition align-top">
                 <td class="px-4 py-3"><input type="checkbox" ${r.selected ? 'checked' : ''} onchange="toggleRow('${esc(r.id)}', this.checked)"></td>
                 <td class="px-2 py-3 text-xs text-gray-400">${idx + 1}</td>
                 <td class="px-2 py-3">
-                    <p class="text-sm text-gray-900 font-medium leading-tight">Firemní zápis <span class="text-gray-400 font-normal">· název a adresa na odkazu</span></p>
+                    ${title}
                     <p class="text-[11px] text-gray-400 mt-0.5">${locTxt}</p>
                 </td>
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
-                <td class="px-2 py-3">${tour}</td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                     <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-500 transition"><i class="fa-solid fa-map-location-dot"></i> otevřít zápis</a>
                 </td>
             </tr>`;
         }).join('');
+
+        renderMap(rows);
     }
 
     // ===================== EXPORT CSV =====================
@@ -674,13 +679,12 @@
         const sel = all.filter(r => r.selected);
         const rows = sel.length ? sel : all;
         if (!rows.length) { showToast('Není co exportovat.'); return; }
-        const head = ['Nalezeno přes', 'Oblast', 'Vzdálenost od středu (km)', 'Souřadnice (přibližné)', 'Přesnost (m)', 'Virtuálka', 'Odkaz na zápis'];
+        const head = ['Název', 'Nalezeno přes', 'Oblast', 'Vzdálenost od středu (km)', 'Souřadnice (přibližné)', 'Přesnost (m)', 'Odkaz na zápis'];
         const line = r => [
-            r.cats.join(', '), r.area || '',
+            r.name || '', r.cats.join(', '), r.area || '',
             r.distM != null ? fmtKm(r.distM) : '',
             r.loc ? (r.loc.lat.toFixed(5) + ', ' + r.loc.lng.toFixed(5)) : '',
             r.accM != null ? r.accM : '',
-            r.tour === 'yes' ? 'má' : (r.tour === 'no' ? 'nemá' : 'neověřeno'),
             mapsLink(r.id)
         ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(';');
         const csv = '\uFEFF' + head.join(';') + '\n' + rows.map(line).join('\n');
@@ -721,13 +725,13 @@
 
         const txt = lines.join('\n');
         let hint = '';
-        if (/has not been used|is disabled|SERVICE_DISABLED/i.test(txt)) hint = '\n\nŘEŠENÍ: V Cloud Console povolte službu „Places API (New)" — console.cloud.google.com/apis/library/places.googleapis.com → Enable.';
+        if (/has not been used|is disabled|SERVICE_DISABLED/i.test(txt)) hint = '\n\nŘEŠENÍ: V Cloud Console povolte „Places API (New)" — console.cloud.google.com/apis/library/places.googleapis.com → Enable.';
         else if (/referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(txt)) hint = '\n\nŘEŠENÍ: Přidejte do Website restrictions klíče položku https://' + location.hostname + '/* (s hvězdičkou, bez cesty).';
         else if (/API key not valid/i.test(txt)) hint = '\n\nŘEŠENÍ: Klíč je neplatný — zkontrolujte, že je vložený celý a správně.';
         showApiError(lines.every(l => !l.startsWith('✗')) ? txt + '\n\nVšechny testy prošly.' : txt + hint);
     }
 
-    // ===================== MAPS JS API =====================
+    // ===================== MAPS JS API (jen geokódování obce) =====================
     let mapsReadyResolve;
     const mapsReady = new Promise(res => { mapsReadyResolve = res; });
     window.initGoogleServices = function () { mapsReadyResolve(); };
