@@ -58,6 +58,7 @@
                 <div class="flex justify-between"><span>Virtuálky <span class="text-brand-600 font-semibold">zdarma</span></span><strong id="cnt-sv" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Adresy <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-addr" class="text-gray-900">0</strong></div>
                 <div class="flex justify-between"><span>Geokódování <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-geo" class="text-gray-900">0</strong></div>
+                <div class="flex justify-between"><span>Našeptávač <span class="text-gray-400">(10 000/měs.)</span></span><strong id="cnt-ac" class="text-gray-900">0</strong></div>
             </div>
             <p class="px-3 mt-2 text-[10.5px] text-gray-400 leading-relaxed">Hledání a ověření virtuálek jsou zdarma bez limitu. Adresy a geokódování mají měsíční limit zdarma, který se resetuje 1. den v měsíci.</p>
         </nav>
@@ -233,7 +234,7 @@
     const state = {
         results: new Map(),      // placeId -> row
         geoCache: new Map(),
-        counters: { free: 0, sv: 0, addr: 0, geo: 0 },
+        counters: { free: 0, sv: 0, addr: 0, geo: 0, ac: 0 },
         busy: false
     };
     document.getElementById('query-count').textContent = ALL_QUERIES.length;
@@ -266,6 +267,7 @@
         document.getElementById('cnt-sv').textContent = state.counters.sv;
         document.getElementById('cnt-addr').textContent = state.counters.addr;
         document.getElementById('cnt-geo').textContent = state.counters.geo;
+        document.getElementById('cnt-ac').textContent = state.counters.ac;
     }
 
     // ===================== GEOKÓDOVÁNÍ OBCE (přes Maps JS API – funguje s klíčem omezeným na doménu) =====================
@@ -295,32 +297,42 @@
     }
 
     // ===================== NAŠEPTÁVAČ OBCÍ (Autocomplete – zdarma do 10 000/měs.) =====================
-    let acService = null, sugTimer = null, sugItems = [], sugActive = -1;
+    let sugTimer = null, sugItems = [], sugActive = -1, sugSeq = 0;
     function onPlaceInput() {
         clearTimeout(sugTimer);
         const q = document.getElementById('inp-place').value.trim();
         if (q.length < 2) { hideSuggest(); return; }
         sugTimer = setTimeout(() => fetchSuggestions(q), 300);
     }
-    function fetchSuggestions(q) {
-        mapsReady.then(() => {
-            if (!acService) acService = new google.maps.places.AutocompleteService();
-            acService.getPlacePredictions({
-                input: q,
-                types: ['(regions)'],
-                componentRestrictions: { country: ['cz', 'sk'] },
-                language: 'cs'
-            }, (preds, status) => {
-                if (status !== 'OK' || !preds || !preds.length) { hideSuggest(); return; }
-                sugItems = preds.slice(0, 6).map(p => ({
-                    main: (p.structured_formatting && p.structured_formatting.main_text) || p.description,
-                    sec: (p.structured_formatting && p.structured_formatting.secondary_text) || '',
-                    full: p.description
-                }));
-                sugActive = -1;
-                renderSuggest();
+    async function fetchSuggestions(q) {
+        const seq = ++sugSeq;
+        try {
+            const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': EFFECTIVE_API_KEY },
+                body: JSON.stringify({
+                    input: q,
+                    languageCode: 'cs',
+                    includedRegionCodes: ['cz', 'sk'],
+                    includedPrimaryTypes: ['(regions)']
+                })
             });
-        });
+            bumpCounter('ac');
+            if (!r.ok) { hideSuggest(); return; }
+            const j = await r.json();
+            if (seq !== sugSeq) return; // mezitím přišel novější dotaz
+            const preds = (j.suggestions || []).map(s => s.placePrediction).filter(Boolean);
+            if (!preds.length) { hideSuggest(); return; }
+            sugItems = preds.slice(0, 6).map(p => ({
+                main: (p.structuredFormat && p.structuredFormat.mainText && p.structuredFormat.mainText.text) || (p.text && p.text.text) || '',
+                sec: (p.structuredFormat && p.structuredFormat.secondaryText && p.structuredFormat.secondaryText.text) || '',
+                full: (p.text && p.text.text) || ''
+            }));
+            sugActive = -1;
+            renderSuggest();
+        } catch (e) {
+            hideSuggest();
+        }
     }
     function renderSuggest() {
         const box = document.getElementById('place-suggest');
