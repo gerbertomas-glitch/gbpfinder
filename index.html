@@ -149,14 +149,14 @@
                             <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                             <input id="flt-text" type="text" placeholder="filtrovat…" oninput="renderTable()" class="pl-8 p-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-brand-500 w-40">
                         </div>
-                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zadaná obec</label>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-town" checked onchange="renderTable()"> jen zadaná obec <span id="flt-town-note" class="text-gray-400 font-normal"></span></label>
                         <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"><input type="checkbox" id="flt-notour" onchange="renderTable()"> jen bez virtuálky</label>
                         <span class="flex-1"></span>
                         <button onclick="loadAddressesForFiltered()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Doplní adresu a souřadnice (nutné pro ověření virtuálek). Zdarma do 10 000 firem měsíčně.">
-                            <i class="fa-solid fa-location-dot"></i> 1) Doplnit adresy <span id="addr-pending-count" class="badge b-gray">0</span>
+                            <i class="fa-solid fa-location-dot"></i> Doplnit adresy <span id="addr-pending-count" class="badge b-gray">0</span>
                         </button>
                         <button onclick="checkAllTours()" class="border border-gray-300 bg-white text-gray-600 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-gray-50 transition inline-flex items-center gap-1.5" title="Zjistí přes Street View metadata (zdarma bez limitu), zda je u firmy nahrané panorama / prohlídka.">
-                            <i class="fa-solid fa-street-view"></i> 2) Ověřit virtuálky <span class="badge b-green">zdarma</span>
+                            <i class="fa-solid fa-street-view"></i> Ověřit virtuálky <span class="badge b-green">zdarma</span>
                         </button>
                         <button onclick="exportCsv()" class="bg-brand-500 text-white py-2 px-3.5 rounded-lg text-xs font-bold hover:bg-brand-600 transition shadow-sm inline-flex items-center gap-1.5">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
@@ -466,8 +466,20 @@
                 } while (token && page < maxPages);
                 if (i % 10 === 0) renderTable();
             }
+            // Automaticky doplnit adresy nových zápisů (zdarma v limitu) – bez nich nejde poznat, které firmy jsou opravdu v zadané obci
+            const noAddr = [...state.results.values()].filter(r => !r.address && !r.addrLoading);
+            if (noAddr.length && noAddr.length <= 400) {
+                progText.textContent = 'Doplňuji adresy 0/' + noAddr.length + '…';
+                await loadAddressesCore(noAddr, (done, total) => { progText.textContent = 'Doplňuji adresy ' + done + '/' + total + '…'; });
+            } else if (noAddr.length > 400) {
+                showToast('Zápisů je hodně (' + noAddr.length + ') – adresy doplňte ručně tlačítkem, ať se nečerpá limit zbytečně.');
+            }
+            renderTable();
+            const outOfTown = [...state.results.values()].filter(r => r.inTown === false).length;
             if (failCount > 0 && lastErr) showApiError('Část dotazů selhala (' + failCount + '). Poslední chyba: ' + (lastErr.message || 'neznámá'));
-            showToast(added ? `Přidáno ${added} nových zápisů (celkem ${state.results.size}).` : (failCount ? 'Hledání selhalo – viz chyba nahoře.' : 'Nenašly se žádné nové zápisy.'));
+            showToast(added
+                ? `Přidáno ${added} nových zápisů` + (outOfTown ? `, z toho ${outOfTown} mimo obec (skryto filtrem)` : '') + `.`
+                : (failCount ? 'Hledání selhalo – viz chyba nahoře.' : 'Nenašly se žádné nové zápisy.'));
             renderTable();
         } catch (e) {
             showToast(e.message || 'Hledání selhalo.');
@@ -504,6 +516,13 @@
             row.addrLoading = false;
         }
     }
+    async function loadAddressesCore(pending, progressCb) {
+        for (let i = 0; i < pending.length; i++) {
+            await loadAddress(pending[i].id);
+            if ((i + 1) % 10 === 0) { renderTable(); if (progressCb) progressCb(i + 1, pending.length); }
+            await new Promise(res => setTimeout(res, 80));
+        }
+    }
     async function loadAddressesForFiltered() {
         if (state.busy) return;
         const pending = filteredRows().filter(r => !r.address && !r.addrLoading);
@@ -511,11 +530,7 @@
         if (pending.length > 500 && !confirm('Doplnit adresy pro ' + pending.length + ' zápisů? Limit zdarma je 10 000 měsíčně.')) return;
         state.busy = true;
         showToast('Doplňuji adresy u ' + pending.length + ' zápisů…');
-        for (let i = 0; i < pending.length; i++) {
-            await loadAddress(pending[i].id);
-            if ((i + 1) % 10 === 0) renderTable();
-            await new Promise(res => setTimeout(res, 80));
-        }
+        await loadAddressesCore(pending);
         state.busy = false;
         renderTable();
         showToast('Hotovo – adresy doplněny.');
@@ -549,7 +564,7 @@
         const noCoords = visible.filter(r => r.tour === null && r.lat == null).length;
         const pending = visible.filter(r => r.tour === null && r.lat != null);
         if (!pending.length) {
-            showToast(noCoords ? 'Nejdřív doplňte adresy (krok 1) – bez souřadnic nejde virtuálky ověřit.' : 'Virtuálky u zobrazených zápisů už jsou ověřené.');
+            showToast(noCoords ? 'Nejdřív doplňte adresy – bez souřadnic nejde virtuálky ověřit.' : 'Virtuálky u zobrazených zápisů už jsou ověřené.');
             return;
         }
         state.busy = true;
@@ -604,6 +619,8 @@
         hc.classList.toggle('flex', state.results.size > 0);
         document.getElementById('header-count-value').textContent = rows.length === state.results.size ? state.results.size : rows.length + ' / ' + state.results.size;
         document.getElementById('addr-pending-count').textContent = rows.filter(r => !r.address).length;
+        const hiddenTown = document.getElementById('flt-town').checked ? [...state.results.values()].filter(r => r.inTown === false).length : 0;
+        document.getElementById('flt-town-note').textContent = hiddenTown ? '(' + hiddenTown + ' skryto)' : '';
         document.getElementById('results-empty').classList.toggle('hidden', rows.length > 0 || state.results.size === 0);
 
         document.getElementById('results-body').innerHTML = rows.map((r, idx) => {
