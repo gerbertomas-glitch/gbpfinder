@@ -136,10 +136,13 @@
                     </div>
 
                     <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+                        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="Přidá druhou vrstvu specifičtějších výrazů z oficiálního seznamu kategorií. Sken trvá déle, ale síto je nejhustší možné. Stále zdarma.">
+                            <input type="checkbox" id="inp-deep"> Důkladný sken (+<span id="extra-count">–</span> výrazů) <span class="badge b-green">zdarma</span>
+                        </label>
                         <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" title="Názvy firem nejsou v neomezené bezplatné úrovni. Zaškrtnutím se hledání účtuje do společného limitu 5 000 dotazů měsíčně pro celý tým.">
                             <input type="checkbox" id="inp-names"> Načíst i názvy firem <span class="badge b-amber">čerpá limit 5 000/měs.</span>
                         </label>
-                        <span class="text-[11px] text-gray-400">Sken se sám přizpůsobí velikosti oblasti — malá obec i velké město, vždy se dohledá vše dostupné.</span>
+                        <span class="text-[11px] text-gray-400">Sada výrazů je odvozená z oficiálního seznamu kategorií Google Business Profile pro ČR.</span>
                     </div>
                     <div id="search-progress" class="hidden mt-4 text-xs text-gray-500 flex items-center gap-2">
                         <i class="fa-solid fa-circle-notch spin text-brand-500"></i> <span id="search-progress-text"></span>
@@ -218,17 +221,36 @@
 
     // ===================== DOTAZY =====================
     const ALL_QUERIES = [
-        'firma','firmy','obchod','prodejna','služby','výroba','velkoobchod','kancelář','řemeslník',
-        'restaurace','hospoda','pivnice','kavárna','cukrárna','pekárna','bistro','pizzerie','rychlé občerstvení','catering','vinárna','bar',
-        'hotel','penzion','ubytování','apartmány','kemp',
-        'autoservis','pneuservis','autobazar','autodíly','myčka aut','čerpací stanice','autoškola','autopůjčovna','taxi','autodoprava',
-        'kadeřnictví','holičství','kosmetika','nehtové studio','masáže','solárium','tetování','fitness','wellness','sauna',
-        'lékař','zubař','veterinář','lékárna','optika','fyzioterapie',
-        'potraviny','večerka','řeznictví','ovoce zelenina','květinářství','drogerie','papírnictví','knihkupectví','hračkářství',
-        'oblečení','obuv','klenotnictví','elektro','nábytek','železářství','stavebniny','zahradnictví','chovatelské potřeby','trafika','second hand',
-        'instalatér','elektrikář','malíř','zámečník','truhlář','pokrývač','kominík','sklenář','stěhování','čistírna','prádelna','opravna','úklidové služby',
-        'účetní','právník','advokát','notář','realitní kancelář','pojišťovna','banka','finanční poradce','IT služby','reklamní agentura','tiskárna','fotograf',
-        'školka','škola','sportovní hala','bazén','bowling','kino','muzeum','galerie','farma','vinařství','pivovar','kovovýroba','zemědělské družstvo'
+        // obecné záchytné výrazy
+        'firma','firmy','obchod','prodejna','služby','výroba','velkoobchod','kancelář','řemeslník','podnik','provozovna','servis','prodej','centrum','studio','salon','agentura','ateliér','dílna','sklad','družstvo','s.r.o.',
+        // úřady, instituce a veřejné služby
+        'úřad','obecní úřad','městský úřad','magistrát','úřad práce','finanční úřad','katastrální úřad','pošta','policie','městská policie','hasiči','knihovna','kulturní dům','komunitní centrum','informační centrum','charita','domov pro seniory','pečovatelská služba','azylový dům','sběrný dvůr','technické služby','hřbitovní správa','fara','kostel','sbor',
+        // školství
+        'školka','mateřská škola','škola','základní škola','střední škola','gymnázium','učiliště','základní umělecká škola','jazyková škola','autoškola','vzdělávací centrum','doučování',
+        // jídlo a pití
+        'restaurace','hospoda','pivnice','kavárna','cukrárna','pekárna','bistro','pizzerie','rychlé občerstvení','catering','vinárna','bar','vinotéka','čajovna','zmrzlina','bufet','jídelna','rozvoz jídla','kebab','asijská restaurace',
+        // ubytování
+        'hotel','penzion','ubytování','apartmány','kemp','ubytovna','chatová osada',
+        // auto-moto a doprava
+        'autoservis','pneuservis','autobazar','autodíly','myčka aut','čerpací stanice','autopůjčovna','taxi','autodoprava','STK','emise','autolakovna','karosárna','autoelektrikář','autosklo','odtahová služba','motoservis','prodej motocyklů','servis jízdních kol','prodejna kol','zemědělská technika','autovrakoviště','kurýrní služba','logistika','spedice',
+        // krása a péče
+        'kadeřnictví','holičství','barbershop','kosmetika','nehtové studio','pedikúra','masáže','solárium','tetování','fitness','wellness','sauna','jóga','svatební salon','krejčovství','oprava obuvi',
+        // zdraví
+        'lékař','praktický lékař','dětský lékař','zubař','zubní laboratoř','gynekologie','ortopedie','kožní lékař','oční lékař','psycholog','psychiatr','logoped','fyzioterapie','rehabilitace','zdravotní středisko','poliklinika','veterinář','lékárna','optika','sanatorium','domácí péče',
+        // obchody
+        'potraviny','večerka','supermarket','řeznictví','ovoce zelenina','květinářství','drogerie','papírnictví','knihkupectví','hračkářství','oblečení','obuv','klenotnictví','hodinářství','elektro','nábytek','železářství','stavebniny','zahradnictví','zahradní technika','chovatelské potřeby','rybářské potřeby','zbraně střelivo','trafika','second hand','bazar','zastavárna','starožitnosti','hudebniny','galanterie','látky','vinárna a prodej','domácí potřeby','barvy laky','sklo porcelán','hobby market','uhelné sklady','palivové dřevo',
+        // řemesla a stavebnictví
+        'instalatér','topenář','elektrikář','elektromontáže','malíř','zámečník','zámečnictví','truhlář','tesařství','pokrývač','klempíř','kominík','sklenář','zednictví','sádrokarton','podlahářství','obkladač','kamnářství','čalounictví','kovárna','kovovýroba','stavební firma','projekční kancelář','architekt','geodet','revize','vzduchotechnika','klimatizace','stěhování','čistírna','prádelna','opravna','úklidové služby','půjčovna nářadí','kontejnery','kovošrot','pila','dřevovýroba',
+        // profesní služby
+        'účetní','daňový poradce','právník','advokát','advokátní kancelář','notář','exekutor','realitní kancelář','pojišťovna','pojišťovací makléř','banka','směnárna','finanční poradce','IT služby','softwarová firma','webdesign','marketing','reklamní agentura','tiskárna','copy centrum','fotograf','pracovní agentura','překladatel','pohřební služba','sázková kancelář',
+        // volný čas, sport a zemědělství
+        'sportovní hala','sportovní klub','fotbalový klub','tělocvična','bazén','koupaliště','bowling','kino','divadlo','muzeum','galerie','střelnice','paintball','lanové centrum','taneční studio','bojové sporty','jízdárna','půjčovna','herna','farma','statek','včelařství','moštárna','palírna','vinařství','pivovar','zemědělské družstvo','myslivecký spolek','zahrádkářská kolonie','TJ Sokol',
+        // doplněno podle oficiálního seznamu kategorií Google Business Profile (CZ)
+        'dodavatel','výrobce','společnost','klub','dealer','autosalon','klinika','ordinace','ambulance','hřiště','organizace','spolek','sdružení','poradce','poradenství','konzultant','inženýr','technik','kurzy','pronájem','čištění','péče','instruktor','trenér','lektor','středisko','zařízení','nemocnice','terapeut','terapie','stanice','areál','lázně','poskytovatel','správa','údržba','závod','oddíl','útulek','laboratoř','akademie','poradna','opravy','doprava','přeprava','domov','ústav','makléř','zubní','právní služby','potřeby','vybavení','cestovní kancelář','montáž'
+    ];
+    // Důkladný sken – druhá vrstva specifičtějších výrazů (volitelně)
+    const EXTRA_QUERIES = [
+        'vývozce','dovozce','distributor','vydavatel','stavitel','odhadce','učitel','umělec','designér','organizátor','chirurg','fakulta','univerzita','vysoká škola','soud','archiv','letiště','základna','elektrárna','mlýn','kovář','loděnice','přístaviště','tábor','úpravna','broušení','zpracování','pojištění','rezervace','park','zahrada','botanická zahrada','kaple','klášter','synagoga','katedrála','modlitebna','stánek','občerstvení','komplex','bydlení','vlakové nádraží','autobusové nádraží','kurt','ranč','dráha','hvězdárna','zoo','zámek','hrad','rozhledna','památník','turistická atrakce','místo konání akcí','svatby','hlídání dětí','dětský tábor','strojírenství','slévárna','fotovoltaika','tepelná čerpadla','plastová okna','žaluzie','ploty','bazény','zavlažování','kácení stromů','deratizace','ostraha','bezpečnostní agentura','detektivní kancelář','výdejní místo','gravírování','rámování','krmiva','hodinový manžel','chovatel','pěstování','tisk','řezání','osobní trenér','jazykové kurzy','psí salon','svářečství','izolace','fasády','lešení','jeřábnické práce','zemní práce','autopůjčovna dodávek','recyklace','výkup'
     ];
 
     const state = {
@@ -497,6 +519,7 @@
             drawPreview(geo, area, true);
 
             // ---- FÁZE 1: nalezení všech zápisů (adaptivní hloubka) ----
+            const queryList = document.getElementById('inp-deep').checked ? ALL_QUERIES.concat(EXTRA_QUERIES) : ALL_QUERIES;
             const queryHits = new Map();
             let added = 0, okCount = 0, failCount = 0, lastErr = null, qi = 0;
             const register = (f, q) => {
@@ -516,10 +539,10 @@
                 if (!queryHits.has(q)) queryHits.set(q, new Set());
                 queryHits.get(q).add(f.id);
             };
-            for (const q of ALL_QUERIES) {
+            for (const q of queryList) {
                 if (state.cancel) break;
                 qi++;
-                progText.textContent = `Fáze 1/2 · hledání ${Math.round(qi / ALL_QUERIES.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
+                progText.textContent = `Fáze 1/2 · hledání ${Math.round(qi / queryList.length * 100)} % · „${q}" · zatím ${state.results.size} zápisů`;
                 try { await scanQuery(q, area.rect, 0, withNames, register); okCount++; }
                 catch (e) {
                     failCount++; lastErr = e;
@@ -817,6 +840,7 @@
     })();
 
     // ===================== INIT =====================
+    document.getElementById('extra-count').textContent = EXTRA_QUERIES.length;
     ensureMap();
     </script>
 </body>
