@@ -235,43 +235,38 @@
         </main>
     </div>
 
-    <!-- PODSTRÁNKA: FIREMNÍ PROFIL -->
-    <div id="profile-modal" class="hidden fixed inset-0 z-[70] bg-gray-100 overflow-y-auto">
-        <div class="sticky top-0 bg-surface border-b border-border h-14 flex items-center gap-3 px-4 sm:px-8 z-10">
-            <button onclick="closeProfile()" class="inline-flex items-center gap-2 border border-gray-300 bg-white text-gray-700 rounded-lg py-1.5 px-3.5 text-sm font-semibold hover:bg-gray-50 transition"><i class="fa-solid fa-arrow-left"></i> Zpět na výsledky</button>
-            <h3 class="font-bold text-gray-900 text-sm hidden sm:block">Firemní profil</h3>
-            <span id="modal-owner" class="badge b-gray hidden"></span>
-            <span class="flex-1"></span>
-            <button onclick="openFullProfile()" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3.5 text-sm font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-solid fa-arrow-up-right-from-square"></i> Celý profil (Google)</button>
-        </div>
-        <div class="max-w-6xl mx-auto p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-            <div class="lg:col-span-3 card-minimal overflow-hidden">
-                <iframe id="modal-iframe" class="w-full" style="height:62vh;min-height:380px;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-                <div class="px-4 py-2.5 border-t border-gray-100 text-[11px] text-gray-400">Telefon a web zobrazíte tlačítkem „Celý profil (Google)" vpravo nahoře — do vloženého náhledu je Google nedává.</div>
+    <!-- OKNO: KARTA ZÁPISU -->
+    <div id="profile-modal" class="hidden fixed inset-0 z-[70]">
+        <div class="absolute inset-0 bg-gray-900/60" onclick="closeProfile()"></div>
+        <div class="absolute inset-x-3 top-4 bottom-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[560px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3 shrink-0">
+                <h3 class="font-bold text-gray-900 text-sm">Karta zápisu</h3>
+                <span id="modal-owner" class="badge b-gray hidden"></span>
+                <span class="flex-1"></span>
+                <button onclick="openFullProfile()" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3.5 text-xs font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-regular fa-eye"></i> Zobrazit profil</button>
+                <button onclick="closeProfile()" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="lg:col-span-2 card-minimal p-5">
-                <div class="flex items-center gap-3 mb-1 flex-wrap">
-                    <p class="text-sm font-bold text-gray-900">Přidat do mého seznamu</p>
-                </div>
-                <div class="flex items-center gap-3 mb-4 flex-wrap">
-                    <div id="modal-stars" class="flex items-center gap-0.5" onmouseleave="hoverStars(0)"></div>
-                    <span class="text-[11px] text-gray-400">1 = studený · 5 = velmi horký</span>
-                    <span class="flex-1"></span>
-                    <div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-bold">
-                        <button type="button" id="ver-yes" onclick="setVerified('yes')" class="py-1.5 px-3 transition">Ověřen</button>
-                        <button type="button" id="ver-no" onclick="setVerified('no')" class="py-1.5 px-3 transition border-l border-gray-200">Neověřen</button>
+            <div class="flex-1 overflow-y-auto">
+                <iframe id="modal-iframe" class="w-full" style="height:200px;border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+                <div class="p-5">
+                    <div class="flex items-center gap-3 mb-4 flex-wrap">
+                        <div id="modal-stars" class="flex items-center gap-0.5" onmouseleave="hoverStars(0)"></div>
+                        <span class="text-[11px] text-gray-400">1 = studený · 5 = horký</span>
+                        <span class="flex-1"></span>
+                        <div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-bold">
+                            <button type="button" id="ver-yes" onclick="setVerified('yes')" class="py-1.5 px-3 transition">Ověřen</button>
+                            <button type="button" id="ver-no" onclick="setVerified('no')" class="py-1.5 px-3 transition border-l border-gray-200">Neověřen</button>
+                        </div>
                     </div>
-                </div>
-                <div class="grid grid-cols-1 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Název zápisu (vlastní pojmenování)</label>
-                        <input id="modal-name" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="např. Restaurace U Lípy – Podolánka">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Kontaktní osoba</label>
-                        <input id="modal-person" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="Jan Novák">
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Název zápisu (vlastní pojmenování)</label>
+                            <input id="modal-name" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="např. Restaurace U Lípy – Podolánka">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Kontaktní osoba</label>
+                            <input id="modal-person" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="Jan Novák">
+                        </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Telefon</label>
                             <input id="modal-phone" type="tel" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="+420 …">
@@ -280,8 +275,6 @@
                             <label class="block text-xs font-medium text-gray-500 mb-1">Telefon 2</label>
                             <input id="modal-phone2" type="tel" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="+420 …">
                         </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">E-mail</label>
                             <input id="modal-email" type="email" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="info@…">
@@ -290,17 +283,17 @@
                             <label class="block text-xs font-medium text-gray-500 mb-1">Web</label>
                             <input id="modal-web" type="text" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500" placeholder="www.…">
                         </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Osobní poznámka</label>
+                            <textarea id="modal-note" rows="2" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500 resize-y" placeholder="např. majitel má zájem o virtuálku, zavolat v pondělí…"></textarea>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Osobní poznámka</label>
-                        <textarea id="modal-note" rows="3" class="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-brand-500 resize-y" placeholder="např. majitel má zájem o virtuálku, zavolat v pondělí…"></textarea>
+                    <div class="mt-4 flex items-center gap-2 flex-wrap">
+                        <button onclick="saveLead()" class="bg-brand-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-solid fa-plus mr-1.5"></i>Uložit do seznamu</button>
+                        <button id="modal-remove" onclick="removeLead()" class="hidden border border-red-200 text-red-600 py-2 px-4 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Odebrat ze seznamu</button>
+                        <span class="text-[11px] text-gray-400">Seznam se sdílí s celým týmem.</span>
                     </div>
                 </div>
-                <div class="mt-4 flex items-center gap-2 flex-wrap">
-                    <button onclick="saveLead()" class="bg-brand-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-brand-600 transition shadow-sm"><i class="fa-solid fa-plus mr-1.5"></i>Uložit do seznamu</button>
-                    <button id="modal-remove" onclick="removeLead()" class="hidden border border-red-200 text-red-600 py-2 px-4 rounded-lg text-sm font-semibold hover:bg-red-50 transition">Odebrat ze seznamu</button>
-                </div>
-                <p class="mt-3 text-[11px] text-gray-400">Údaje zkopírujte z celého profilu. Seznam se sdílí s celým týmem.</p>
             </div>
         </div>
     </div>
@@ -932,7 +925,7 @@
                 </td>
                 <td class="px-2 py-3 text-xs text-gray-500">${esc(r.cats.join(', '))}</td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
-                    <button onclick="openProfile('${esc(r.id)}')" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-600 transition"><i class="fa-regular fa-eye"></i> zobrazit profil</button>
+                    <button onclick="openProfile('${esc(r.id)}')" class="inline-flex items-center gap-1.5 bg-brand-500 text-white rounded-lg py-1.5 px-3 text-xs font-bold hover:bg-brand-600 transition"><i class="fa-regular fa-address-card"></i> karta zápisu</button>
                     <button onclick="quickExclude('${esc(r.id)}')" title="${isExc ? 'Vrátit mezi aktivní' : 'Vyřadit – při příštím skenu oblasti hned uvidíte, že tenhle zápis už nechcete'}" class="inline-flex items-center gap-1.5 border ${isExc ? 'border-red-300 bg-white text-red-600 hover:bg-red-50' : 'border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300'} rounded-lg py-1.5 px-3 text-xs font-semibold transition ml-1"><i class="fa-solid ${isExc ? 'fa-rotate-left' : 'fa-ban'}"></i> ${isExc ? 'obnovit' : 'vyřadit'}</button>
                     <a href="${mapsLink(r.id)}" target="_blank" rel="noopener" title="Otevřít v Google Mapách" class="inline-flex w-8 h-[30px] border border-gray-200 rounded-lg items-center justify-center text-gray-500 hover:text-brand-600 hover:border-brand-500 transition ml-1"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
                 </td>
@@ -1214,13 +1207,25 @@
     }
     let starHover = 0;
     function renderModalStars() {
-        const shown = starHover || state.modalStars;
-        document.getElementById('modal-stars').innerHTML = [1, 2, 3, 4, 5].map(i =>
-            `<button type="button" onclick="setStars(${i})" onmouseenter="hoverStars(${i})" class="text-lg leading-none ${i <= shown ? 'text-amber-400' : 'text-gray-200'} transition"><i class="fa-solid fa-star"></i></button>`
-        ).join('');
+        // DOM se vytvoří jen jednou; při hoveru/kliku se pouze přebarvuje – jinak překreslení "spolkne" klik
+        const box = document.getElementById('modal-stars');
+        if (!box.dataset.built) {
+            box.innerHTML = [1, 2, 3, 4, 5].map(i =>
+                `<button type="button" onclick="setStars(${i})" onmouseenter="hoverStars(${i})" class="star-btn text-lg leading-none text-gray-200 transition"><i class="fa-solid fa-star"></i></button>`
+            ).join('');
+            box.dataset.built = '1';
+        }
+        paintStars();
     }
-    function hoverStars(n) { starHover = n; renderModalStars(); }
-    function setStars(n) { state.modalStars = (state.modalStars === n) ? 0 : n; starHover = 0; renderModalStars(); }
+    function paintStars() {
+        const shown = starHover || state.modalStars;
+        document.querySelectorAll('#modal-stars .star-btn').forEach((b, idx) => {
+            b.classList.toggle('text-amber-400', idx < shown);
+            b.classList.toggle('text-gray-200', idx >= shown);
+        });
+    }
+    function hoverStars(n) { starHover = n; paintStars(); }
+    function setStars(n) { state.modalStars = (state.modalStars === n) ? 0 : n; starHover = 0; paintStars(); }
     function renderVerified() {
         const y = document.getElementById('ver-yes'), n = document.getElementById('ver-no');
         y.className = 'py-1.5 px-3 transition ' + (state.modalVerified === 'yes' ? 'bg-brand-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50');
